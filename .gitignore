@@ -1,4 +1,15 @@
-# Byte-compiled / optimized / DLL files
+resultados*
+*.h5
+*.xml
+*.png 
+*.out
+
+
+
+
+
+
+# Byte-compiled / optimized / DLL fill
 __pycache__/
 *.py[codz]
 *$py.class
