@@ -164,6 +164,7 @@ class modelo:
         ## Para não ter que digitar o código de criação de duas células iguais, a célula pode ser clonada.
         ## Universos podem ser reaproveitados em mais de um lattice
 
+
         ######################################################
         ######################################################
         ####  Definições gerais de uma vareta combustível ####
@@ -342,17 +343,17 @@ class modelo:
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
-            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, T, C, C, G, C, C, C, G, C, C, T, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
-            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, T, C, C, T, C, C, I, C, C, T, C, C, T, C, C],
-            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
             [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
-            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, T, C, C, G, C, C, C, G, C, C, T, C, C, C],
             [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
@@ -367,13 +368,13 @@ class modelo:
         elemento31G08_lattice.outer = universoAgua_universo
 
         elemento31G08_lattice_celula = openmc.Cell(name="Celula FA3", fill=elemento31G08_lattice)
-        elemento31G08_lattice_universo = openmc.Universe(cells=[elemento31G08_lattice_celula,universoAgua_universo])
+        elemento31G08_lattice_universo = openmc.Universe(cells=[elemento31G08_lattice_celula])
 
 
 
         ######################################################
         ######################################################
-        #############   Elemento 31G16  ###################
+        ###############   Elemento 31G16  ####################
         ######################################################
         ######################################################
 
@@ -420,7 +421,7 @@ class modelo:
         elemento31G16_lattice.outer = universoAgua_universo
 
         elemento31G16_lattice_celula = openmc.Cell(name="Celula FA4", fill=elemento31G16_lattice)
-        elemento31G16_lattice_universo = openmc.Universe(cells=[elemento31G16_lattice_celula, universoAgua_universo])
+        elemento31G16_lattice_universo = openmc.Universe(cells=[elemento31G16_lattice_celula])
 
 
 
@@ -433,14 +434,23 @@ class modelo:
         ######################################################
         ######################################################
 
+        # Criando universo Vareta Combustível com Enriquecimento de 1.9%
+        elemento19_celula   = openmc.Cell(fill=self.material_uranio_19, region= pallet_regiao)
+        elemento19_Universo = openmc.Universe()
+        elemento19_Universo.add_cell(elemento19_celula)
+        elemento19_Universo.add_cell(gap_celula)
+        elemento19_Universo.add_cell(revestimento_celula)
+        elemento19_Universo.add_cell(refrigerente_celula)
 
-        celula_combustivel_19 = openmc.Cell(fill=self.material_uranio_19, region=regiao_pallet)
-        universo_vareta_19 = openmc.Universe(cells=[celula_combustivel_19, gap_celula, revestimento_celula, agua_celula])
+        elemento19_tuboGuia_universo =  openmc.Universe()
+        elemento19_tuboGuia_universo.add_cell(tuboGuia_celula)
+        elemento19_tuboGuia_universo.add_cell(refrigerenteTuboGuia_celula)
+        elemento19_tuboGuia_universo.add_cell(barraControle_aguaInf_celula)
 
         # Legendas para a matriz
-        M = universo_vareta_19    # Combustível 1.9% (M de matriz)
-        T = universo_tubo_guia
-        I = universo_tubo_guia
+        M = elemento19_Universo    # Combustível 1.9% (M de matriz)
+        T = elemento19_tuboGuia_universo
+        I = elemento19_tuboGuia_universo
 
         # Matriz 17x17 para o FA1 (Sem varetas de Gadolina - Figura 3a)
         matriz_fa1 = [
@@ -467,10 +477,10 @@ class modelo:
         lattice_fa1.pitch = (1.26, 1.26)
         lattice_fa1.universes = matriz_fa1
         lattice_fa1.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        lattice_fa1.outer = universo_agua_inf
+        lattice_fa1.outer = universoAgua_universo
 
         celula_fa1 = openmc.Cell(name="Celula FA1", fill=lattice_fa1)
-        universo_19000 = openmc.Universe(cells=[celula_fa1, agua_celula])
+        universo_19000 = openmc.Universe(cells=[celula_fa1])
 
 
 
@@ -480,10 +490,13 @@ class modelo:
         ######################################################
         ######################################################
 
-        C = universo_vareta_31       # Combustível 3.1%
-        G = universo_vareta_gadolina # Gadolina (16 varetas)
-        T = universo_tubo_guia       # Tubo de Guia
-        I = universo_tubo_guia       # Instrumentação
+
+
+
+        C = elemento31Gxx_vareta31_universo          # Combustível 3.1%
+        G = elemento31Gxx_vareta31Gadolina_universo  # Gadolina (16 varetas)
+        T = elemento31G16_tuboGuia_universo          # Tubo de Guia
+        I = elemento31G16_tuboGuia_universo          # Instrumentação
 
         # Matriz 17x17 para o FA2 (16 varetas BP - Figura 3c)
         matriz_fa2 = [
@@ -510,10 +523,10 @@ class modelo:
         lattice_fa2.pitch = (1.26, 1.26)
         lattice_fa2.universes = matriz_fa2
         lattice_fa2.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        lattice_fa2.outer = universo_agua_inf
+        lattice_fa2.outer = universoAgua_universo
 
         celula_fa2 = openmc.Cell(name="Celula FA2", fill=lattice_fa2)
-        universo_31G16 = openmc.Universe(cells=[celula_fa2,agua_celula])
+        universo_31G16 = openmc.Universe(cells=[celula_fa2])
 
 
 
@@ -524,10 +537,10 @@ class modelo:
         ######################################################
 
 
-        C = universo_vareta_31       # Combustível 3.1%
-        G = universo_vareta_gadolina # Gadolina (8 varetas)
-        T = universo_tubo_guia       # Tubo de Guia
-        I = universo_tubo_guia       # Instrumentação
+        C = elemento31Gxx_vareta31_universo          # Combustível 3.1%
+        G = elemento31Gxx_vareta31Gadolina_universo # Gadolina (8 varetas)
+        T = elemento31G16_tuboGuia_universo       # Tubo de Guia
+        I = elemento31G16_tuboGuia_universo       # Instrumentação
 
         # Matriz 17x17 para o FA5 (8 varetas BP - conforme Figura 3b)
         matriz_fa5 = [
@@ -554,10 +567,10 @@ class modelo:
         lattice_fa5.pitch = (1.26, 1.26)
         lattice_fa5.universes = matriz_fa5
         lattice_fa5.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        lattice_fa5.outer = universo_agua_inf
+        lattice_fa5.outer = universoAgua_universo
 
         celula_fa5 = openmc.Cell(name="Celula FA5", fill=lattice_fa5)
-        universo_31000G08 = openmc.Universe(cells=[celula_fa5, ])
+        universo_31000G08 = openmc.Universe(cells=[celula_fa5 ])
 
 
 
@@ -595,7 +608,7 @@ class modelo:
         lattice_nucleo.pitch = (21.42,21.42)
         lattice_nucleo.universes = matriz_nucleo
         lattice_nucleo.lower_left = (- (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,     - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0)
-        lattice_nucleo.outer = universo_agua_inf
+        lattice_nucleo.outer = universoAgua_universo
 
         nucleo_cilindro = openmc.ZCylinder(r = 125, boundary_type= 'vacuum')
         regiao_nucleo   =   -nucleo_cilindro & +pallet_planoInf & -pallet_planoSup
