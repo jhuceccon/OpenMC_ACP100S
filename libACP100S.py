@@ -12,11 +12,12 @@
 
 
 import openmc
+import openmc.model
 from datetime import datetime
 import os
 
 # Criar pasta e mudar para a pasta criada:
-def mkdir(nome="teste_sem_nome",data=True,voltar=False):
+def mkdir(nome="teste_sem_nome",data=True,voltar=False,chdir=True):
     if (voltar==True):
         os.chdir("../")
     if (data==True):
@@ -24,7 +25,8 @@ def mkdir(nome="teste_sem_nome",data=True,voltar=False):
         nome = agora.strftime(nome+"_%Y%m%d_%H%M%S")
     if not os.path.exists(nome):
         os.makedirs(nome)
-    os.chdir(nome)
+    if chdir:
+        os.chdir(nome)
 
 
 
@@ -184,7 +186,7 @@ class modelo:
         #gapSuperior_regiao
         gapRadial_regiao    = +pallet_cilindro & -gapRadial_cilindro    & +pallet_planoInf & -pallet_planoSup # A limitação sup e inf do gapRadial é a mesma do pallet
         gap_regiao          = gapRadial_regiao # + União com gapSuperior_regiao
-        gap_celula          = openmc.Cell(fill = self.m_ar, region = gap_regiao)
+        gap_celula          = openmc.Cell(fill = self.m_helio, region = gap_regiao)
 
 
         # Definições do revestimento (iguais para todas varetas e elementos combustíveis)
@@ -208,24 +210,30 @@ class modelo:
         # Plotando vareta completa para debug
         if plotar_interno:
             # Esta celula daqui serve apenas para plotar a geometria de uma vareta
-            pallet_celula   = openmc.Cell(fill=self.m_uranio31, region= pallet_regiao)
+            pallet_celula_plot   = openmc.Cell(fill=self.m_uranio31, region=pallet_regiao)
+
+            # Criando uma célula refrigerante que seja limitada apenas para o plot
+            ## Detalhe: O limite XY da caixa é baseado no pitch da vareta
+            limite_xy_plot = openmc.model.RectangularPrism(axis="z", width=pitch_varetas, height=pitch_varetas)
+            refrigerente_regiao_plot = +revestimentoRadial_cilindro & -limite_xy_plot & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup      
+            refrigerente_celula_plot = openmc.Cell(fill=self.m_agua, region=refrigerente_regiao_plot)
 
             # Criando um universo contendo
-            vareta_universo = openmc.Universe()
-            vareta_universo.add_cell(pallet_celula)
-            vareta_universo.add_cell(gap_celula)
-            vareta_universo.add_cell(revestimento_celula)
-            vareta_universo.add_cell(refrigerente_celula)
+            vareta_universo_plot = openmc.Universe()
+            vareta_universo_plot.add_cell(pallet_celula_plot)
+            vareta_universo_plot.add_cell(gap_celula)
+            vareta_universo_plot.add_cell(revestimento_celula)
+            vareta_universo_plot.add_cell(refrigerente_celula_plot)
 
-            geometria_vareta = openmc.Geometry()
-            geometria_vareta.root_universe = vareta_universo
+            # Criando uma geometria apenas para o plot
+            geometria_vareta_plot = openmc.Geometry()
+            geometria_vareta_plot.root_universe = vareta_universo_plot
 
-            self.plotar(
-                geometria=geometria_vareta,
-                filename="vareta_combustível",
-                width=(2,2),
-                pixels=(500,500),
-                )
+            # Plotando várias vistas
+            pasta_plots = "vareta_combustível"
+            mkdir(pasta_plots, data=False, chdir=False) #Crie a pasta mas não mude para dentro da pasta
+            self.plotar(geometria=geometria_vareta_plot,filename=f"{pasta_plots}/centro_xy",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xy")
+            self.plotar(geometria=geometria_vareta_plot,filename=f"{pasta_plots}/centro_xz",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xz")
             
         ######################################################
         ######################################################
@@ -256,7 +264,29 @@ class modelo:
         barraControle_aguaInf_regiao = -tuboGuiaRadial_cilindroInt & +pallet_planoInf & -pallet_planoSup
         barraControle_aguaInf_celula = openmc.Cell(fill=self.m_agua, region=barraControle_aguaInf_regiao)
 
+        # Plotando vareta completa para debug
+        if plotar_interno:
+            # Criando uma célula refrigerante que seja limitada apenas para o plot
+            ## Detalhe: O limite XY da caixa é baseado no pitch da vareta
+            limite_xy_plot = openmc.model.RectangularPrism(axis="z", width=pitch_varetas, height=pitch_varetas)
+            barraControle_aguaInf_regiao_plot = +tuboGuiaRadial_cilindroExt & -limite_xy_plot & +pallet_planoInf & -pallet_planoSup      
+            barraControle_aguaInf_celula_plot = openmc.Cell(fill=self.m_agua, region=barraControle_aguaInf_regiao_plot)
 
+            # Criando um universo contendo
+            guia_universo_plot = openmc.Universe()
+            guia_universo_plot.add_cell(barraControle_aguaInf_celula)
+            guia_universo_plot.add_cell(tuboGuia_celula)
+            guia_universo_plot.add_cell(barraControle_aguaInf_celula_plot)
+
+            # Criando uma geometria apenas para o plot
+            geometria_guia_plot = openmc.Geometry()
+            geometria_guia_plot.root_universe = guia_universo_plot
+
+            # Plotando várias vistas
+            pasta_plots = "tubo_guia"
+            mkdir(pasta_plots, data=False, chdir=False) #Crie a pasta mas não mude para dentro da pasta
+            self.plotar(geometria=geometria_guia_plot,filename=f"{pasta_plots}/centro_xy",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xy")
+            self.plotar(geometria=geometria_guia_plot,filename=f"{pasta_plots}/centro_xz",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xz")
 
         ######################################################
         ######################################################
@@ -426,25 +456,26 @@ class modelo:
         ######################################################
 
         # Criando universo Vareta Combustível com Enriquecimento de 1.9%
-        elemento19_celula   = openmc.Cell(fill=self.m_uranio19, region= pallet_regiao)
-        elemento19_Universo = openmc.Universe()
-        elemento19_Universo.add_cell(elemento19_celula)
-        elemento19_Universo.add_cell(gap_celula)
-        elemento19_Universo.add_cell(revestimento_celula)
-        elemento19_Universo.add_cell(refrigerente_celula)
+        elemento19000_pallet19_celula   = openmc.Cell(fill=self.m_uranio19, region= pallet_regiao)
+        elemento19000_vareta_universo = openmc.Universe()
+        elemento19000_vareta_universo.add_cell(elemento19000_pallet19_celula)
+        elemento19000_vareta_universo.add_cell(gap_celula)
+        elemento19000_vareta_universo.add_cell(revestimento_celula)
+        elemento19000_vareta_universo.add_cell(refrigerente_celula)
 
-        elemento19_tuboGuia_universo =  openmc.Universe()
-        elemento19_tuboGuia_universo.add_cell(tuboGuia_celula)
-        elemento19_tuboGuia_universo.add_cell(refrigerenteTuboGuia_celula)
-        elemento19_tuboGuia_universo.add_cell(barraControle_aguaInf_celula)
+        # Criando universo Tubo Guia para elemento 19000 (falta desenhar o restante da geometria da barra)
+        elemento19000_tuboGuia_universo =  openmc.Universe()
+        elemento19000_tuboGuia_universo.add_cell(tuboGuia_celula)
+        elemento19000_tuboGuia_universo.add_cell(refrigerenteTuboGuia_celula)
+        elemento19000_tuboGuia_universo.add_cell(barraControle_aguaInf_celula)
 
         # Legendas para a matriz
-        M = elemento19_Universo    # Combustível 1.9% (M de matriz)
-        T = elemento19_tuboGuia_universo
-        I = elemento19_tuboGuia_universo
+        M = elemento19000_vareta_universo    # Combustível 1.9% (M de matriz)
+        T = elemento19000_tuboGuia_universo
+        I = elemento19000_tuboGuia_universo
 
         # Matriz 17x17 para o FA1 (Sem varetas de Gadolina - Figura 3a)
-        matriz_fa1 = [
+        elemento19000_matriz = [
             [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
             [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
             [M, M, M, M, M, T, M, M, T, M, M, T, M, M, M, M, M],
@@ -464,14 +495,14 @@ class modelo:
             [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M]
         ]
 
-        lattice_fa1 = openmc.RectLattice(name='Elemento Combustivel FA1')
-        lattice_fa1.pitch = (1.26, 1.26)
-        lattice_fa1.universes = matriz_fa1
-        lattice_fa1.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        lattice_fa1.outer = universoAgua_universo
+        elemento19000_lattice = openmc.RectLattice(name='Elemento Combustivel FA1')
+        elemento19000_lattice.pitch = (pitch_varetas, pitch_varetas)
+        elemento19000_lattice.universes = elemento19000_matriz
+        elemento19000_lattice.lower_left = [-pitch_varetas * len(elemento19000_matriz) / 2, -pitch_varetas * len(elemento19000_matriz) / 2]
+        elemento19000_lattice.outer = universoAgua_universo
 
-        celula_fa1 = openmc.Cell(name="Celula FA1", fill=lattice_fa1)
-        universo_19000 = openmc.Universe(cells=[celula_fa1])
+        elemento19000_lattice_celula = openmc.Cell(name="Celula FA1", fill=elemento19000_lattice)
+        universo_19000 = openmc.Universe(cells=[elemento19000_lattice_celula])
 
 
 
