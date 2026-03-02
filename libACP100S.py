@@ -153,40 +153,116 @@ class modelo:
 
 
 
-    def geometria(self):
+    def geometria(self, alturaBarra = 0, plotar_interno=False):
         print("################################################")
         print("#######     Definição de Geometria        ######")
         print("################################################")
 
-        lista_geometria = []
+        # Estratégia de desenho:
+        ## Superfícies e regiões podem ser reaproveitadas em mais de uma célula
+        ## Entretanto cada célula só pode estar dentro de um universo
+        ## Para não ter que digitar o código de criação de duas células iguais, a célula pode ser clonada.
+        ## Universos podem ser reaproveitados em mais de um lattice
 
-        pallet_altura = 1
-        pallet_cilindro = openmc.ZCylinder(r = 0.4095)
+        ######################################################
+        ######################################################
+        ####  Definições gerais de uma vareta combustível ####
+        ######################################################
+        ######################################################
+
+        pitch_varetas = 1.26
+
+        # Definições do pallet combustível (iguais para todas varetas e elementos combustíveis)
+        pallet_altura    = 1
+        pallet_raio      = 0.4095
+        pallet_cilindro  = openmc.ZCylinder(r = pallet_raio)
+        pallet_planoInf = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
+        pallet_planoSup = openmc.ZPlane(z0 =  pallet_altura/2, boundary_type= 'reflective')
+        pallet_regiao    =                   -pallet_cilindro & +pallet_planoInf & -pallet_planoSup
+        # pallet_celula: cada célula do pallet será definida com um material diferente
         
-        pallet_plano_inf = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective')
-        pallet_plano_sup = openmc.ZPlane(z0 = pallet_altura/2, boundary_type= 'reflective')
 
-        gap_cilindro = openmc.ZCylinder(r = 0.418)
-
-        clad_cilindro = openmc.ZCylinder(r = 0.475)
-
-
-
-        regiao_pallet   =                    -pallet_cilindro & +pallet_plano_inf & -pallet_plano_sup
-        regiao_gap      = +pallet_cilindro & -gap_cilindro    & +pallet_plano_inf & -pallet_plano_sup
-        regiao_clad     = +gap_cilindro    & -clad_cilindro   & +pallet_plano_inf & -pallet_plano_sup
-        regiao_agua_inf = +clad_cilindro                      & +pallet_plano_inf & -pallet_plano_sup
-    
+        # Definições do gap ao redor do pallet combustível (iguais para todas varetas e elementos combustíveis)
+        gapRadial_raio      = 0.418
+        gapRadial_cilindro  = openmc.ZCylinder(r = gapRadial_raio)
+        # O gap axial fica 100% na parte superior (a naõ ser que tenha mola em baixo)
+        #gapSuperior_raio
+        #gapSuperior_planoSup
+        #gapSuperior_planoInf
+        #gapSuperior_regiao
+        gapRadial_regiao    = +pallet_cilindro & -gapRadial_cilindro    & +pallet_planoInf & -pallet_planoSup # A limitação sup e inf do gapRadial é a mesma do pallet
+        gap_regiao          = gapRadial_regiao # + União com gapSuperior_regiao
+        gap_celula          = openmc.Cell(fill = self.m_ar, region = gap_regiao)
 
 
-        pallet_celula = openmc.Cell(fill = self.m_uranio, region = regiao_pallet)
-        gap_celula = openmc.Cell(fill = self.m_ar, region = regiao_gap)
-        clad_celula = openmc.Cell(fill = self.m_SS304, region = regiao_clad)
-        
-        agua_celula = openmc.Cell(fill=self.m_agua, region=regiao_agua_inf)
+        # Definições do revestimento (iguais para todas varetas e elementos combustíveis)
+        revestimentoRadial_raio = 0.475
+        revestimentoRadial_comprimento = pallet_altura #Colocar aqui o comprimento total do revestimento
+        revestimentoRadial_cilindro = openmc.ZCylinder(r = revestimentoRadial_raio)
+        # Desenhar o revestimentoSup e revestimentoInf, isto é, o endplug. Seguir modelo do gap para facilitar
+        # Não usar os planos do pallet, pois o revestimento é maior que os pallets
+        revestimentoRadial_planoInf = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
+        revestimentoRadial_planoSup = openmc.ZPlane(z0 =  revestimentoRadial_comprimento/2, boundary_type= 'reflective')
+        revestimento_regiao     = +gapRadial_cilindro    & -revestimentoRadial_cilindro   & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup
+        revestimento_celula = openmc.Cell(fill=self.material_zircaloy, region=revestimento_regiao)
 
 
-        universo_agua_inf = openmc.Universe(cells=[openmc.Cell(fill=self.m_agua)])
+        # Definições do refrigerante ao redor do revestimento (iguais para todas varetas e elementos combustíveis)
+        # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
+        refrigerente_regiao   = +revestimentoRadial_cilindro                      & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup      
+        refrigerente_celula   = openmc.Cell(fill=self.m_agua, region=refrigerente_regiao)
+
+
+        # Plotando vareta completa para debug
+        if plotar_interno:
+            # Esta celula daqui serve apenas para plotar a geometria de uma vareta
+            pallet_celula   = openmc.Cell(fill=self.material_uranio_31, region= pallet_regiao)
+
+            # Criando um universo contendo
+            vareta_universo = openmc.Universe()
+            vareta_universo.add_cell(pallet_celula)
+            vareta_universo.add_cell(gap_celula)
+            vareta_universo.add_cell(revestimento_celula)
+            vareta_universo.add_cell(refrigerente_celula)
+
+            geometria_vareta = openmc.Geometry()
+            geometria_vareta.root_universe = vareta_universo
+
+            self.plotar(
+                geometria=geometria_vareta,
+                filename="vareta_combustível",
+                width=(2,2),
+                pixels=(500,500),
+                )
+            
+        ######################################################
+        ######################################################
+        ####   Definições gerais das barras de controle   ####
+        ######################################################
+        ######################################################
+
+        # Definições do tubo guia da barra de controle (iguais para todos tubos guia, e também para o tubo de instrumentação)
+        tuboGuiaRadial_raioInt = 0.5715
+        tuboGuiaRadial_raioExt = 0.612
+        tuboGuiaRadial_cilindroInt = openmc.ZCylinder(r=tuboGuiaRadial_raioInt)
+        tuboGuiaRadial_cilindroExt = openmc.ZCylinder(r=tuboGuiaRadial_raioExt)
+        # Igual o revestimento, tem que desenhar a parte superior e inferior.
+        # Entretanto salvo engano ele deve ser aberto em baixo, e a parte superior tem o dobro do tamanho
+        tuboGuia_regiao = +tuboGuiaRadial_cilindroInt & -tuboGuiaRadial_cilindroExt & +pallet_planoInf & -pallet_planoSup
+        tuboGuia_celula = openmc.Cell(fill=self.material_zircaloy, region=tuboGuia_regiao)
+
+        # Definições do refrigerante ao redor do tubo guia (iguais para todos tubos guia, e também para o tubo de instrumentação)
+        # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
+        refrigerenteTuboGuia_regiao   = +tuboGuiaRadial_cilindroExt                      & +pallet_planoInf & -pallet_planoSup      
+        refrigerenteTuboGuia_celula   = openmc.Cell(fill=self.m_agua, region=refrigerenteTuboGuia_regiao)
+
+        # Definições da barra de controle
+        # é preciso usar o parâmetro alturaBarra para definir a altura de um plano.
+        # Para baixo dele é agua, para cima é barra absorvedora
+        # Não esqueça do gap de água entre o tubo guia e a barra
+        # Depois a gente separa as barras em bancos e usa diferentes parâmetros (alturaBarraBanco1, alturaBarraBanco2, etc.) para controlar a altura de cada um
+        barraControle_aguaInf_regiao = -tuboGuiaRadial_cilindroInt & +pallet_planoInf & -pallet_planoSup
+        barraControle_aguaInf_celula = openmc.Cell(fill=self.m_agua, region=barraControle_aguaInf_regiao)
 
 
 
@@ -195,59 +271,74 @@ class modelo:
         #############   Universo Agua   ######################
         ######################################################
         ######################################################
-        regiao_agua_total = +pallet_plano_inf & -pallet_plano_sup
-        agua_celula2 = openmc.Cell(name='Preenchimento com água',
+        
+        # Estou pensando sobre isso ainda
+        universoAgua_regiao = +pallet_planoInf & -pallet_planoSup
+        universoAgua_celula = openmc.Cell(name='Preenchimento com água',
                                 fill=self.m_agua,
-                                region=regiao_agua_total)
-        universo_agua = openmc.Universe(cells=[agua_celula2])
+                                region=universoAgua_regiao)
+        universoAgua_universo = openmc.Universe(cells=[universoAgua_celula])
         
 
 
         ######################################################
         ######################################################
-        #############   Universo RefRad  #####################
+        #############   Elemento RefRad  #####################
+        ######################################################
+        ######################################################
+
+        # Sobre isso também
+        elementoRefRad_regiao   = +pallet_planoInf & -pallet_planoSup
+        elementoRefRad_celula   = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=elementoRefRad_regiao)
+        elementoRefRad_universo = openmc.Universe(cells=[elementoRefRad_celula])
+
+
+        ######################################################
+        ######################################################
+        #########   Comum aos Elementos 31Gxx  ##############
+        ######################################################
+        ######################################################
+
+        # 31G08 = Elemento com enriquecimento de 3.1% + 8 varetas dopadas com gadolina
+
+        # Criando universo Vareta Combustível com Enriquecimento de 3.1%
+        elemento31Gxx_pallet31_celula   = openmc.Cell(fill=self.material_uranio_31, region= pallet_regiao)
+        elemento31Gxx_vareta31_universo = openmc.Universe()
+        elemento31Gxx_vareta31_universo.add_cell(elemento31Gxx_pallet31_celula)
+        elemento31Gxx_vareta31_universo.add_cell(gap_celula)
+        elemento31Gxx_vareta31_universo.add_cell(revestimento_celula)
+        elemento31Gxx_vareta31_universo.add_cell(refrigerente_celula)
+
+        # Criando universo Vareta Combustível com Enriquecimento de 3.1% + gadolina
+        elemento31Gxx_pallet31Gadolina_celula          = openmc.Cell(fill=self.material_gadolina, region=pallet_regiao)
+        elemento31Gxx_vareta31Gadolina_universo = openmc.Universe()
+        elemento31Gxx_vareta31Gadolina_universo.add_cell(elemento31Gxx_pallet31Gadolina_celula)
+        elemento31Gxx_vareta31Gadolina_universo.add_cell(gap_celula)
+        elemento31Gxx_vareta31Gadolina_universo.add_cell(revestimento_celula)
+        elemento31Gxx_vareta31Gadolina_universo.add_cell(refrigerente_celula)
+
+
+        ######################################################
+        ######################################################
+        #############   Elemento 31G08   #####################
         ######################################################
         ######################################################
 
 
-        regiao_refrad = +pallet_plano_inf & -pallet_plano_sup
-        celula_refrad = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=regiao_refrad)
-        universo_RefRad = openmc.Universe(cells=[celula_refrad])
+        # Criando universo Tubo Guia para elemento 31G08 (falta desenhar o restante da geometria da barra)
+        elemento31G08_tuboGuia_universo =  openmc.Universe()
+        elemento31G08_tuboGuia_universo.add_cell(tuboGuia_celula)
+        elemento31G08_tuboGuia_universo.add_cell(refrigerenteTuboGuia_celula)
+        elemento31G08_tuboGuia_universo.add_cell(barraControle_aguaInf_celula)
 
-
-        ######################################################
-        ######################################################
-        #############   universo_31G08   #####################
-        ######################################################
-        ######################################################
-
-        celula_combustivel = openmc.Cell(fill=self.material_uranio_31, region= regiao_pallet)
-        celula_revestimento = openmc.Cell(fill=self.material_zircaloy, region=regiao_clad)
-        self.universo_vareta_31 = openmc.Universe(cells=[celula_combustivel, gap_celula, celula_revestimento, agua_celula])
-
-        celula_gadolina = openmc.Cell(fill=self.material_gadolina, region=regiao_pallet)
-        self.universo_vareta_gadolina = openmc.Universe(cells=[celula_gadolina, gap_celula, celula_revestimento,agua_celula])
-
-        cilindro_guia_interno = openmc.ZCylinder(r=0.5715)
-        cilindro_guia_externo = openmc.ZCylinder(r=0.612)
-
-
-        regiao_guia_agua = -cilindro_guia_interno & +pallet_plano_inf & -pallet_plano_sup
-        regiao_guia_parede = +cilindro_guia_interno & -cilindro_guia_externo & +pallet_plano_inf & -pallet_plano_sup
-        
-        celula_guia_agua = openmc.Cell(fill=self.m_agua, region=regiao_guia_agua)
-        celula_guia_parede = openmc.Cell(fill=self.material_zircaloy, region=regiao_guia_parede)
-        
-        self.universo_tubo_guia = openmc.Universe(cells=[celula_guia_agua, celula_guia_parede,agua_celula])
-
-
-        C = self.universo_vareta_31       # Combustível
-        G = self.universo_vareta_gadolina # Gadolina (8 varetas)
-        T = self.universo_tubo_guia       # Tubo de Guia
-        I = self.universo_tubo_guia       # Instrumentação (mesma dimensão do GT) 
+        # Definindo abreviações
+        C = elemento31Gxx_vareta31_universo                 # Combustível
+        G = elemento31Gxx_vareta31Gadolina_universo         # Gadolina (8 varetas)
+        T = elemento31G08_tuboGuia_universo                 # Tubo de Guia
+        I = elemento31G08_tuboGuia_universo                 # Instrumentação (mesma dimensão do GT) 
 
         # Matriz 17x17 baseada na Figura 3b do documento 
-        matriz_fa3 = [
+        elemento31G08_matriz = [
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
@@ -267,34 +358,42 @@ class modelo:
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
         ]
 
-        lattice_fa3 = openmc.RectLattice(name='Elemento Combustivel FA3')
-        lattice_fa3.pitch = (1.26, 1.26) # Cell Pitch de 1.26 cm 
-        lattice_fa3.universes = matriz_fa3
-        lattice_fa3.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        
-        # Preencher o espaço entre as varetas com o seu universo de água
-        lattice_fa3.outer = universo_agua_inf
+        # Definindo lattice do elemento 31G08
 
-        celula_fa3 = openmc.Cell(name="Celula FA3", fill=lattice_fa3)
-        universo_31G08 = openmc.Universe(cells=[celula_fa3])
+        elemento31G08_lattice = openmc.RectLattice(name='Elemento Combustivel FA3')
+        elemento31G08_lattice.pitch = (pitch_varetas, pitch_varetas) # Cell Pitch de 1.26 cm 
+        elemento31G08_lattice.universes = elemento31G08_matriz
+        elemento31G08_lattice.lower_left = [-pitch_varetas * len(elemento31G08_matriz) / 2, -pitch_varetas * len(elemento31G08_matriz) / 2]
+        elemento31G08_lattice.outer = universoAgua_universo
+
+        elemento31G08_lattice_celula = openmc.Cell(name="Celula FA3", fill=elemento31G08_lattice)
+        elemento31G08_lattice_universo = openmc.Universe(cells=[elemento31G08_lattice_celula,universoAgua_universo])
 
 
 
         ######################################################
         ######################################################
-        #############   universo_31000G16  ###################
+        #############   Elemento 31G16  ###################
         ######################################################
         ######################################################
 
+        # 31G16 = Elemento com enriquecimento de 3.1% + 16 varetas dopadas com gadolina
+
+        # Criando universo Tubo Guia para elemento 31G16 (falta desenhar o restante da geometria da barra)
+        # Depois tem que ver a alocação do banco de barras, acho que as barras aqui estão em um banco diferente do elemento31G08
+        elemento31G16_tuboGuia_universo =  openmc.Universe()
+        elemento31G16_tuboGuia_universo.add_cell(tuboGuia_celula)
+        elemento31G16_tuboGuia_universo.add_cell(refrigerenteTuboGuia_celula)
+        elemento31G16_tuboGuia_universo.add_cell(barraControle_aguaInf_celula)
 
         # Reutilizando as definições de varetas que criamos antes
-        C = self.universo_vareta_31       # Combustível 3.1%
-        G = self.universo_vareta_gadolina # Gadolina (Agora serão 16 varetas)
-        T = self.universo_tubo_guia       # Tubo de Guia
-        I = self.universo_tubo_guia       # Instrumentação
+        C = elemento31Gxx_vareta31_universo         # Combustível 3.1%
+        G = elemento31Gxx_vareta31Gadolina_universo # Gadolina (Agora serão 16 varetas)
+        T = elemento31G16_tuboGuia_universo         # Tubo de Guia
+        I = elemento31G16_tuboGuia_universo         # Instrumentação
 
         # Matriz 17x17 para o FA4 (Disposição típica com 16 BP)
-        matriz_fa4 = [
+        elemento31G16_matriz = [
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
             [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
@@ -314,35 +413,34 @@ class modelo:
             [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
         ]
 
-        lattice_fa4 = openmc.RectLattice(name='Elemento Combustivel FA4')
-        lattice_fa4.pitch = (1.26, 1.26)
-        lattice_fa4.universes = matriz_fa4
-        lattice_fa4.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
-        lattice_fa4.outer = universo_agua_inf
+        elemento31G16_lattice = openmc.RectLattice(name='Elemento Combustivel FA4')
+        elemento31G16_lattice.pitch = (pitch_varetas, pitch_varetas)
+        elemento31G16_lattice.universes = elemento31G16_matriz
+        elemento31G16_lattice.lower_left = [-pitch_varetas * len(elemento31G16_matriz) / 2, -pitch_varetas * len(elemento31G16_matriz) / 2]
+        elemento31G16_lattice.outer = universoAgua_universo
 
-        celula_fa4 = openmc.Cell(name="Celula FA4", fill=lattice_fa4)
-        universo_31000G16 = openmc.Universe(cells=[celula_fa4, agua_celula])
+        elemento31G16_lattice_celula = openmc.Cell(name="Celula FA4", fill=elemento31G16_lattice)
+        elemento31G16_lattice_universo = openmc.Universe(cells=[elemento31G16_lattice_celula, universoAgua_universo])
 
 
-        nucleo_cilindro = openmc.ZCylinder(r = 125, boundary_type= 'vacuum')
-        regiao_nucleo   =   -nucleo_cilindro & +pallet_plano_inf & -pallet_plano_sup
+
 
 
 
         ######################################################
         ######################################################
-        #############     universo_19000   ###################
+        #############     Elemento 19000   ###################
         ######################################################
         ######################################################
 
 
         celula_combustivel_19 = openmc.Cell(fill=self.material_uranio_19, region=regiao_pallet)
-        universo_vareta_19 = openmc.Universe(cells=[celula_combustivel_19, gap_celula, celula_revestimento, agua_celula])
+        universo_vareta_19 = openmc.Universe(cells=[celula_combustivel_19, gap_celula, revestimento_celula, agua_celula])
 
         # Legendas para a matriz
         M = universo_vareta_19    # Combustível 1.9% (M de matriz)
-        T = self.universo_tubo_guia
-        I = self.universo_tubo_guia
+        T = universo_tubo_guia
+        I = universo_tubo_guia
 
         # Matriz 17x17 para o FA1 (Sem varetas de Gadolina - Figura 3a)
         matriz_fa1 = [
@@ -378,14 +476,14 @@ class modelo:
 
         ######################################################
         ######################################################
-        #############     universo_31G16   ###################
+        #############     Elemento 31G16   ###################
         ######################################################
         ######################################################
 
-        C = self.universo_vareta_31       # Combustível 3.1%
-        G = self.universo_vareta_gadolina # Gadolina (16 varetas)
-        T = self.universo_tubo_guia       # Tubo de Guia
-        I = self.universo_tubo_guia       # Instrumentação
+        C = universo_vareta_31       # Combustível 3.1%
+        G = universo_vareta_gadolina # Gadolina (16 varetas)
+        T = universo_tubo_guia       # Tubo de Guia
+        I = universo_tubo_guia       # Instrumentação
 
         # Matriz 17x17 para o FA2 (16 varetas BP - Figura 3c)
         matriz_fa2 = [
@@ -421,15 +519,15 @@ class modelo:
 
         ######################################################
         ######################################################
-        #############   universo_31000G08   ##################
+        #############   Elemento 31000G08   ##################
         ######################################################
         ######################################################
 
 
-        C = self.universo_vareta_31       # Combustível 3.1%
-        G = self.universo_vareta_gadolina # Gadolina (8 varetas)
-        T = self.universo_tubo_guia       # Tubo de Guia
-        I = self.universo_tubo_guia       # Instrumentação
+        C = universo_vareta_31       # Combustível 3.1%
+        G = universo_vareta_gadolina # Gadolina (8 varetas)
+        T = universo_tubo_guia       # Tubo de Guia
+        I = universo_tubo_guia       # Instrumentação
 
         # Matriz 17x17 para o FA5 (8 varetas BP - conforme Figura 3b)
         matriz_fa5 = [
@@ -470,10 +568,10 @@ class modelo:
         ######################################################
 
 
-        A = universo_agua
-        R = universo_RefRad
-        V = universo_31G08
-        C = universo_31000G16
+        A = universoAgua_universo
+        R = elementoRefRad_universo
+        V = elemento31G08_lattice_universo
+        C = elemento31G16_lattice_universo
         M = universo_19000
         Y = universo_31G16
         T = universo_31000G08
@@ -499,6 +597,9 @@ class modelo:
         lattice_nucleo.lower_left = (- (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,     - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0)
         lattice_nucleo.outer = universo_agua_inf
 
+        nucleo_cilindro = openmc.ZCylinder(r = 125, boundary_type= 'vacuum')
+        regiao_nucleo   =   -nucleo_cilindro & +pallet_planoInf & -pallet_planoSup
+
         celula_nucleo = openmc.Cell(fill=lattice_nucleo, region=regiao_nucleo)
         universo_nucleo = openmc.Universe(cells=[celula_nucleo])
 
@@ -521,7 +622,8 @@ class modelo:
 
     def plotar(
             self,
-            filename = 'plot.png',
+            geometria=None,
+            filename = None,
             basis  = 'xy',
             width  = (200, 200),
             pixels = (800, 800),
@@ -532,7 +634,13 @@ class modelo:
         print("###########        Plotagem         ############")
         print("################################################")
         if plotar:
-            plot = openmc.Plot()
+            if geometria is None:
+                geometria = self.lista_geometria
+
+            if filename is None:
+                filename = 'plot_' + basis + '_' + str(width) + '_' + str(pixels) + '_' + str(origin)
+
+            plot = openmc.Plot.from_geometry(geometria)
             plot.filename = filename
             plot.basis = basis
             plot.width = width
@@ -544,7 +652,7 @@ class modelo:
             plots = openmc.Plots([plot])
 
             self.lista_materiais.export_to_xml()
-            self.lista_geometria.export_to_xml()
+            geometria.export_to_xml()
             plots.export_to_xml()
             openmc.plot_geometry()
             

@@ -23,10 +23,11 @@ ini=3
 fin=4
 passo=1
 for enr in range(ini,fin,passo):
-    libACP100S.mkdir(nome=f"resultados_UO2_enriquecimento_{enr}", data=True, voltar=False if enr == ini else True) 
+    libACP100S.mkdir(nome=f"resultados_UO2_enriquecimento_{enr}", data=False, voltar=False if enr == ini else True) 
     reator = libACP100S.modelo()
     reator.materiais(enriquecimento=enr/100)
-    reator.geometria()
+    reator.geometria(plotar_interno=True)
     reator.configuracoes(particulas=1000)
-    reator.plotar(width=(250,250),pixels=(1000,1000))
+    reator.plotar(width=(250,250),pixels=(5000,5000))
+    reator.plotar(filename="zoom1", width=(25,25),pixels=(5000,5000))
     reator.simular()
