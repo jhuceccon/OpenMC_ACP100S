@@ -66,51 +66,35 @@ class modelo:
 
 
 
-    def materiais(self, enriquecimento = 20):
+    def materiais(self):
         print("################################################")
         print("#######     Definição de Materiais        ######")
         print("################################################")
         self.lista_materiais = openmc.Materials()
         self.m_cores = {}
 
-        #agua
+        # Água
         self.m_agua=openmc.Material(name = "Água leve")
         self.m_agua.add_nuclide('H1',2)
         self.m_agua.add_nuclide('O16',1)
         self.m_agua.set_density('g/cm3', 1)
         self.lista_materiais.append(self.m_agua)
         self.m_cores[self.m_agua] = "blue"
-        
-        #uanio
-        self.m_uranio=openmc.Material(name = "uranio 20\\% \enriquecido")
-        self.m_uranio.add_element('U',1,enrichment = enriquecimento)
-        self.m_uranio.set_density('g/cm3', 18)
-        self.lista_materiais.append(self.m_uranio)
-        self.m_cores[self.m_uranio] = "yellow"
 
-        self.m_SS304 = openmc.Material(name='Aço INOX', material_id=5)
-        self.m_SS304.add_element('C',  4.3000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('Cr', 1.9560E-01 , percent_type = 'wo')
-        self.m_SS304.add_element('Ni', 9.6600E-02 , percent_type = 'wo')
-        self.m_SS304.add_element('Mo', 8.9000E-03 , percent_type = 'wo')
-        self.m_SS304.add_element('Mn', 5.4000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('Si', 5.0000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('Cu', 2.0000E-05 , percent_type = 'wo')
-        self.m_SS304.add_element('Co', 3.0000E-05 , percent_type = 'wo')
-        self.m_SS304.add_element('P',  2.7000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('S',  1.0000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('N',  1.4000E-04 , percent_type = 'wo')
-        self.m_SS304.add_element('Fe', 6.9687E-01 , percent_type = 'wo')
-        self.m_SS304.set_density('g/cm3', 7.92)
-        self.lista_materiais.append(self.m_SS304)
-        self.m_cores[self.m_SS304] = "gray"
+        # Gás Hélio
+        self.m_helio = openmc.Material(name='Gás Hélio')
+        self.m_helio.add_element('He', 1.0, percent_type='ao')
+        self.m_helio.set_density('g/cm3', 0.0001786) #Densidade do gás Hélio a 1 atm e 0°C
+        self.lista_materiais.append(self.m_helio)
+        self.m_cores[self.m_helio] = "lightpink"
 
-        self.m_ar = openmc.Material(name='Ar', material_id=3)
+        # Ar
+        self.m_ar = openmc.Material(name='Ar', )
         self.m_ar.add_nuclide('N14' , 7.7826E-01 , percent_type='ao')
         self.m_ar.add_nuclide('N15' , 2.8589E-03 , percent_type='ao')
         self.m_ar.add_nuclide('O16' , 1.0794E-01 , percent_type='ao')
         self.m_ar.add_nuclide('O17' , 1.0156E-01 , percent_type='ao')
-        #self.m_ar.add_nuclide('O18' , 3.8829E-05 , percent_type='ao')
+        #self.m_ar.add_nuclide('O18' , 3.8829E-05 , percent_type='ao') #Comentado pois ENDF 7.1 não possui essa tabela de seção de choque
         self.m_ar.add_nuclide('Ar36', 2.6789E-03 , percent_type='ao')
         self.m_ar.add_nuclide('Ar38', 3.4177E-03 , percent_type='ao')
         self.m_ar.add_nuclide('Ar40', 3.2467E-03 , percent_type='ao')
@@ -118,38 +102,45 @@ class modelo:
         self.lista_materiais.append(self.m_ar)
         self.m_cores[self.m_ar] = "white"
 
-        # Urânio Enriquecido a 3.1% (FA2, FA3) 
-        self.material_uranio_31 = openmc.Material(name="Uranio Enriquecido 3.1%")
-        self.material_uranio_31.add_element('U', 1.0, enrichment=3.1)
-        self.material_uranio_31.add_element('O', 2.0)
-        self.material_uranio_31.set_density('g/cm3', 10.257)
-        self.lista_materiais.append(self.material_uranio_31) # ADICIONE ESTA LINHA
-        self.m_cores[self.material_uranio_31] = "yellow"
-
-        # Urânio com Veneno Queimável (8% Gd2O3) 
-        self.material_gadolina = openmc.Material(name="UO2 + 8% Gd2O3")
-        self.material_gadolina.add_element('U', 0.92, enrichment=3.1)
-        self.material_gadolina.add_element('Gd', 0.08)
-        self.material_gadolina.add_element('O', 2.0)
-        self.material_gadolina.set_density('g/cm3', 10.1)
-        self.lista_materiais.append(self.material_gadolina) # ADICIONE ESTA LINHA
-        self.m_cores[self.material_gadolina] = "green"
-
         # Zircaloy-4
-        self.material_zircaloy = openmc.Material(name="Zircaloy-4")
-        self.material_zircaloy.add_element('Zr', 0.98)
-        self.material_zircaloy.add_element('Sn', 0.01)
-        self.material_zircaloy.set_density('g/cm3', 6.55)
-        self.lista_materiais.append(self.material_zircaloy) # ADICIONE ESTA LINHA
-        self.m_cores[self.material_zircaloy] = "gray"
+        self.m_zircaloy = openmc.Material(name="Zircaloy-4")
+        self.m_zircaloy.add_element('Zr', 0.98185, percent_type='wo')
+        self.m_zircaloy.add_element('Sn', 0.01500, percent_type='wo')
+        self.m_zircaloy.add_element('Fe', 0.00200, percent_type='wo')
+        self.m_zircaloy.add_element('Cr', 0.00100, percent_type='wo')
+        self.m_zircaloy.add_element('O',  0.00015, percent_type='wo')
+        self.m_zircaloy.set_density('g/cm3', 6.55)
+        self.lista_materiais.append(self.m_zircaloy)
+        self.m_cores[self.m_zircaloy] = "gray"
 
         # Urânio Enriquecido a 1.9% (FA1)
-        self.material_uranio_19 = openmc.Material(name="Uranio Enriquecido 1.9%")
-        self.material_uranio_19.add_element('U', 1.0, enrichment=1.9)
-        self.material_uranio_19.add_element('O', 2.0)
-        self.material_uranio_19.set_density('g/cm3', 10.257)
-        self.lista_materiais.append(self.material_uranio_19)
-        self.m_cores[self.material_uranio_19] = "orange" # Cor distinta para o 1.9%
+        self.m_uranio19 = openmc.Material(name="Uranio Enriquecido 1.9%")
+        self.m_uranio19.add_element('U', 1.0, enrichment=1.9)
+        self.m_uranio19.add_element('O', 2.0)
+        self.m_uranio19.set_density('g/cm3', 10.257)
+        self.lista_materiais.append(self.m_uranio19)
+        self.m_cores[self.m_uranio19] = "orange"
+
+        # Urânio Enriquecido a 3.1% (FA2, FA3) 
+        self.m_uranio31 = openmc.Material(name="Uranio Enriquecido 3.1%")
+        self.m_uranio31.add_element('U', 1.0, enrichment=3.1)
+        self.m_uranio31.add_element('O', 2.0)
+        self.m_uranio31.set_density('g/cm3', 10.257)
+        self.lista_materiais.append(self.m_uranio31)
+        self.m_cores[self.m_uranio31] = "yellow"
+
+        # Urânio Enriquecido a 3.1% com Veneno Queimável (8% Gd2O3) 
+        self.m_uranio31_gadolina = openmc.Material(name="Uranio Enriquecido 3.1% + 8% Gd2O3")
+        self.m_uranio31_gadolina.add_element('U', 0.92, enrichment=3.1)
+        self.m_uranio31_gadolina.add_element('Gd', 0.08)
+        self.m_uranio31_gadolina.add_element('O', 2.0)
+        self.m_uranio31_gadolina.set_density('g/cm3', 10.1)
+        self.lista_materiais.append(self.m_uranio31_gadolina)
+        self.m_cores[self.m_uranio31_gadolina] = "green"
+
+
+
+
 
 
 
@@ -205,7 +196,7 @@ class modelo:
         revestimentoRadial_planoInf = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
         revestimentoRadial_planoSup = openmc.ZPlane(z0 =  revestimentoRadial_comprimento/2, boundary_type= 'reflective')
         revestimento_regiao     = +gapRadial_cilindro    & -revestimentoRadial_cilindro   & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup
-        revestimento_celula = openmc.Cell(fill=self.material_zircaloy, region=revestimento_regiao)
+        revestimento_celula = openmc.Cell(fill=self.m_zircaloy, region=revestimento_regiao)
 
 
         # Definições do refrigerante ao redor do revestimento (iguais para todas varetas e elementos combustíveis)
@@ -217,7 +208,7 @@ class modelo:
         # Plotando vareta completa para debug
         if plotar_interno:
             # Esta celula daqui serve apenas para plotar a geometria de uma vareta
-            pallet_celula   = openmc.Cell(fill=self.material_uranio_31, region= pallet_regiao)
+            pallet_celula   = openmc.Cell(fill=self.m_uranio31, region= pallet_regiao)
 
             # Criando um universo contendo
             vareta_universo = openmc.Universe()
@@ -250,7 +241,7 @@ class modelo:
         # Igual o revestimento, tem que desenhar a parte superior e inferior.
         # Entretanto salvo engano ele deve ser aberto em baixo, e a parte superior tem o dobro do tamanho
         tuboGuia_regiao = +tuboGuiaRadial_cilindroInt & -tuboGuiaRadial_cilindroExt & +pallet_planoInf & -pallet_planoSup
-        tuboGuia_celula = openmc.Cell(fill=self.material_zircaloy, region=tuboGuia_regiao)
+        tuboGuia_celula = openmc.Cell(fill=self.m_zircaloy, region=tuboGuia_regiao)
 
         # Definições do refrigerante ao redor do tubo guia (iguais para todos tubos guia, e também para o tubo de instrumentação)
         # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
@@ -303,7 +294,7 @@ class modelo:
         # 31G08 = Elemento com enriquecimento de 3.1% + 8 varetas dopadas com gadolina
 
         # Criando universo Vareta Combustível com Enriquecimento de 3.1%
-        elemento31Gxx_pallet31_celula   = openmc.Cell(fill=self.material_uranio_31, region= pallet_regiao)
+        elemento31Gxx_pallet31_celula   = openmc.Cell(fill=self.m_uranio31, region= pallet_regiao)
         elemento31Gxx_vareta31_universo = openmc.Universe()
         elemento31Gxx_vareta31_universo.add_cell(elemento31Gxx_pallet31_celula)
         elemento31Gxx_vareta31_universo.add_cell(gap_celula)
@@ -311,7 +302,7 @@ class modelo:
         elemento31Gxx_vareta31_universo.add_cell(refrigerente_celula)
 
         # Criando universo Vareta Combustível com Enriquecimento de 3.1% + gadolina
-        elemento31Gxx_pallet31Gadolina_celula          = openmc.Cell(fill=self.material_gadolina, region=pallet_regiao)
+        elemento31Gxx_pallet31Gadolina_celula          = openmc.Cell(fill=self.m_uranio31_gadolina, region=pallet_regiao)
         elemento31Gxx_vareta31Gadolina_universo = openmc.Universe()
         elemento31Gxx_vareta31Gadolina_universo.add_cell(elemento31Gxx_pallet31Gadolina_celula)
         elemento31Gxx_vareta31Gadolina_universo.add_cell(gap_celula)
@@ -435,7 +426,7 @@ class modelo:
         ######################################################
 
         # Criando universo Vareta Combustível com Enriquecimento de 1.9%
-        elemento19_celula   = openmc.Cell(fill=self.material_uranio_19, region= pallet_regiao)
+        elemento19_celula   = openmc.Cell(fill=self.m_uranio19, region= pallet_regiao)
         elemento19_Universo = openmc.Universe()
         elemento19_Universo.add_cell(elemento19_celula)
         elemento19_Universo.add_cell(gap_celula)
