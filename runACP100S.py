@@ -28,5 +28,5 @@ for enr in range(ini,fin,passo):
     reator.materiais(enriquecimento=enr/100)
     reator.geometria()
     reator.configuracoes(particulas=1000)
-    reator.plotar(width=(100,100),pixels=(1000,1000))
+    reator.plotar(width=(250,250),pixels=(1000,1000))
     reator.simular()

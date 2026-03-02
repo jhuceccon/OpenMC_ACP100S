@@ -110,13 +110,47 @@ class modelo:
         self.m_ar.add_nuclide('N15' , 2.8589E-03 , percent_type='ao')
         self.m_ar.add_nuclide('O16' , 1.0794E-01 , percent_type='ao')
         self.m_ar.add_nuclide('O17' , 1.0156E-01 , percent_type='ao')
-        self.m_ar.add_nuclide('O18' , 3.8829E-05 , percent_type='ao')
+        #self.m_ar.add_nuclide('O18' , 3.8829E-05 , percent_type='ao')
         self.m_ar.add_nuclide('Ar36', 2.6789E-03 , percent_type='ao')
         self.m_ar.add_nuclide('Ar38', 3.4177E-03 , percent_type='ao')
         self.m_ar.add_nuclide('Ar40', 3.2467E-03 , percent_type='ao')
         self.m_ar.set_density('g/cm3', 0.001225)
         self.lista_materiais.append(self.m_ar)
         self.m_cores[self.m_ar] = "white"
+
+        # Urânio Enriquecido a 3.1% (FA2, FA3) 
+        self.material_uranio_31 = openmc.Material(name="Uranio Enriquecido 3.1%")
+        self.material_uranio_31.add_element('U', 1.0, enrichment=3.1)
+        self.material_uranio_31.add_element('O', 2.0)
+        self.material_uranio_31.set_density('g/cm3', 10.257)
+        self.lista_materiais.append(self.material_uranio_31) # ADICIONE ESTA LINHA
+        self.m_cores[self.material_uranio_31] = "yellow"
+
+        # Urânio com Veneno Queimável (8% Gd2O3) 
+        self.material_gadolina = openmc.Material(name="UO2 + 8% Gd2O3")
+        self.material_gadolina.add_element('U', 0.92, enrichment=3.1)
+        self.material_gadolina.add_element('Gd', 0.08)
+        self.material_gadolina.add_element('O', 2.0)
+        self.material_gadolina.set_density('g/cm3', 10.1)
+        self.lista_materiais.append(self.material_gadolina) # ADICIONE ESTA LINHA
+        self.m_cores[self.material_gadolina] = "green"
+
+        # Zircaloy-4
+        self.material_zircaloy = openmc.Material(name="Zircaloy-4")
+        self.material_zircaloy.add_element('Zr', 0.98)
+        self.material_zircaloy.add_element('Sn', 0.01)
+        self.material_zircaloy.set_density('g/cm3', 6.55)
+        self.lista_materiais.append(self.material_zircaloy) # ADICIONE ESTA LINHA
+        self.m_cores[self.material_zircaloy] = "gray"
+
+        # Urânio Enriquecido a 1.9% (FA1)
+        self.material_uranio_19 = openmc.Material(name="Uranio Enriquecido 1.9%")
+        self.material_uranio_19.add_element('U', 1.0, enrichment=1.9)
+        self.material_uranio_19.add_element('O', 2.0)
+        self.material_uranio_19.set_density('g/cm3', 10.257)
+        self.lista_materiais.append(self.material_uranio_19)
+        self.m_cores[self.material_uranio_19] = "orange" # Cor distinta para o 1.9%
+
 
 
     def geometria(self):
@@ -127,14 +161,14 @@ class modelo:
         lista_geometria = []
 
         pallet_altura = 1
-        pallet_cilindro = openmc.ZCylinder(r = 0.4)
+        pallet_cilindro = openmc.ZCylinder(r = 0.4095)
         
         pallet_plano_inf = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective')
         pallet_plano_sup = openmc.ZPlane(z0 = pallet_altura/2, boundary_type= 'reflective')
 
-        gap_cilindro = openmc.ZCylinder(r = 0.45)
+        gap_cilindro = openmc.ZCylinder(r = 0.418)
 
-        clad_cilindro = openmc.ZCylinder(r = 0.5)
+        clad_cilindro = openmc.ZCylinder(r = 0.475)
 
 
 
@@ -142,71 +176,307 @@ class modelo:
         regiao_gap      = +pallet_cilindro & -gap_cilindro    & +pallet_plano_inf & -pallet_plano_sup
         regiao_clad     = +gap_cilindro    & -clad_cilindro   & +pallet_plano_inf & -pallet_plano_sup
         regiao_agua_inf = +clad_cilindro                      & +pallet_plano_inf & -pallet_plano_sup
-        regiao_agua     =                                       +pallet_plano_inf & -pallet_plano_sup
+    
 
 
         pallet_celula = openmc.Cell(fill = self.m_uranio, region = regiao_pallet)
         gap_celula = openmc.Cell(fill = self.m_ar, region = regiao_gap)
         clad_celula = openmc.Cell(fill = self.m_SS304, region = regiao_clad)
         
-        agua_celula = openmc.Cell(fill = self.m_agua, region = regiao_agua_inf)
-        agua_celula2 = openmc.Cell(fill = self.m_agua, region = regiao_agua)
+        agua_celula = openmc.Cell(fill=self.m_agua, region=regiao_agua_inf)
 
-        u = openmc.Universe(cells=[pallet_celula, gap_celula, clad_celula, agua_celula])
 
-        ua = openmc.Universe(cells=[agua_celula2])
-
-        lattice = openmc.RectLattice()
-
-        
-        lattice.pitch = (1.1, 1.1)
-        lattice.universes = [[u, u, u],
-                            [u, ua, u],
-                            [u, u, u]]
-        lattice.lower_left = (- (len(lattice.universes[0]) * lattice.pitch[0]) / 2.0,     - (len(lattice.universes) * lattice.pitch[1]) / 2.0)
         universo_agua_inf = openmc.Universe(cells=[openmc.Cell(fill=self.m_agua)])
-        lattice.outer = universo_agua_inf
 
 
-        celula_elemento_comb = openmc.Cell(fill=lattice)
-        universo_elemento_comb = openmc.Universe(cells=[celula_elemento_comb])
 
         ######################################################
         ######################################################
         #############   Universo Agua   ######################
         ######################################################
         ######################################################
-        regiao_agua     =                                       +pallet_plano_inf & -pallet_plano_sup
-        agua_celula2 = openmc.Cell(fill = self.m_agua, region = regiao_agua)
-        ua = openmc.Universe(cells=[agua_celula2])
-  
+        regiao_agua_total = +pallet_plano_inf & -pallet_plano_sup
+        agua_celula2 = openmc.Cell(name='Preenchimento com água',
+                                fill=self.m_agua,
+                                region=regiao_agua_total)
+        universo_agua = openmc.Universe(cells=[agua_celula2])
+        
 
 
         ######################################################
         ######################################################
-        #############   Lattice Núcleo  ######################
+        #############   Universo RefRad  #####################
         ######################################################
         ######################################################
 
 
-        nucleo_cilindro = openmc.ZCylinder(r = 70, boundary_type= 'vacuum')
+        regiao_refrad = +pallet_plano_inf & -pallet_plano_sup
+        celula_refrad = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=regiao_refrad)
+        universo_RefRad = openmc.Universe(cells=[celula_refrad])
+
+
+        ######################################################
+        ######################################################
+        #############   universo_31G08   #####################
+        ######################################################
+        ######################################################
+
+        celula_combustivel = openmc.Cell(fill=self.material_uranio_31, region= regiao_pallet)
+        celula_revestimento = openmc.Cell(fill=self.material_zircaloy, region=regiao_clad)
+        self.universo_vareta_31 = openmc.Universe(cells=[celula_combustivel, gap_celula, celula_revestimento, agua_celula])
+
+        celula_gadolina = openmc.Cell(fill=self.material_gadolina, region=regiao_pallet)
+        self.universo_vareta_gadolina = openmc.Universe(cells=[celula_gadolina, gap_celula, celula_revestimento,agua_celula])
+
+        cilindro_guia_interno = openmc.ZCylinder(r=0.5715)
+        cilindro_guia_externo = openmc.ZCylinder(r=0.612)
+
+
+        regiao_guia_agua = -cilindro_guia_interno & +pallet_plano_inf & -pallet_plano_sup
+        regiao_guia_parede = +cilindro_guia_interno & -cilindro_guia_externo & +pallet_plano_inf & -pallet_plano_sup
+        
+        celula_guia_agua = openmc.Cell(fill=self.m_agua, region=regiao_guia_agua)
+        celula_guia_parede = openmc.Cell(fill=self.material_zircaloy, region=regiao_guia_parede)
+        
+        self.universo_tubo_guia = openmc.Universe(cells=[celula_guia_agua, celula_guia_parede,agua_celula])
+
+
+        C = self.universo_vareta_31       # Combustível
+        G = self.universo_vareta_gadolina # Gadolina (8 varetas)
+        T = self.universo_tubo_guia       # Tubo de Guia
+        I = self.universo_tubo_guia       # Instrumentação (mesma dimensão do GT) 
+
+        # Matriz 17x17 baseada na Figura 3b do documento 
+        matriz_fa3 = [
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, I, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
+        ]
+
+        lattice_fa3 = openmc.RectLattice(name='Elemento Combustivel FA3')
+        lattice_fa3.pitch = (1.26, 1.26) # Cell Pitch de 1.26 cm 
+        lattice_fa3.universes = matriz_fa3
+        lattice_fa3.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
+        
+        # Preencher o espaço entre as varetas com o seu universo de água
+        lattice_fa3.outer = universo_agua_inf
+
+        celula_fa3 = openmc.Cell(name="Celula FA3", fill=lattice_fa3)
+        universo_31G08 = openmc.Universe(cells=[celula_fa3])
+
+
+
+        ######################################################
+        ######################################################
+        #############   universo_31000G16  ###################
+        ######################################################
+        ######################################################
+
+
+        # Reutilizando as definições de varetas que criamos antes
+        C = self.universo_vareta_31       # Combustível 3.1%
+        G = self.universo_vareta_gadolina # Gadolina (Agora serão 16 varetas)
+        T = self.universo_tubo_guia       # Tubo de Guia
+        I = self.universo_tubo_guia       # Instrumentação
+
+        # Matriz 17x17 para o FA4 (Disposição típica com 16 BP)
+        matriz_fa4 = [
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, T, G, C, C, G, C, G, C, C, G, T, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, I, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, T, G, C, C, G, C, G, C, C, G, T, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
+        ]
+
+        lattice_fa4 = openmc.RectLattice(name='Elemento Combustivel FA4')
+        lattice_fa4.pitch = (1.26, 1.26)
+        lattice_fa4.universes = matriz_fa4
+        lattice_fa4.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
+        lattice_fa4.outer = universo_agua_inf
+
+        celula_fa4 = openmc.Cell(name="Celula FA4", fill=lattice_fa4)
+        universo_31000G16 = openmc.Universe(cells=[celula_fa4, agua_celula])
+
+
+        nucleo_cilindro = openmc.ZCylinder(r = 125, boundary_type= 'vacuum')
         regiao_nucleo   =   -nucleo_cilindro & +pallet_plano_inf & -pallet_plano_sup
 
 
-        #A = universo_agua
-        #R = universo_RefRad
-        #V = universo_31G08
-        #C = universo_31000G16
-        #M = universo_19000
-        #Y = universo_31G16
+
+        ######################################################
+        ######################################################
+        #############     universo_19000   ###################
+        ######################################################
+        ######################################################
 
 
-        A = ua
-        R = universo_elemento_comb
-        V = universo_elemento_comb
-        C = universo_elemento_comb
-        M = universo_elemento_comb
-        Y = universo_elemento_comb
+        celula_combustivel_19 = openmc.Cell(fill=self.material_uranio_19, region=regiao_pallet)
+        universo_vareta_19 = openmc.Universe(cells=[celula_combustivel_19, gap_celula, celula_revestimento, agua_celula])
+
+        # Legendas para a matriz
+        M = universo_vareta_19    # Combustível 1.9% (M de matriz)
+        T = self.universo_tubo_guia
+        I = self.universo_tubo_guia
+
+        # Matriz 17x17 para o FA1 (Sem varetas de Gadolina - Figura 3a)
+        matriz_fa1 = [
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, M, M, T, M, M, T, M, M, T, M, M, M, M, M],
+            [M, M, M, T, M, M, M, M, M, M, M, M, M, T, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, T, M, M, T, M, M, T, M, M, T, M, M, T, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, T, M, M, T, M, M, I, M, M, T, M, M, T, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, T, M, M, T, M, M, T, M, M, T, M, M, T, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, T, M, M, M, M, M, M, M, M, M, T, M, M, M],
+            [M, M, M, M, M, T, M, M, T, M, M, T, M, M, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M],
+            [M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M, M]
+        ]
+
+        lattice_fa1 = openmc.RectLattice(name='Elemento Combustivel FA1')
+        lattice_fa1.pitch = (1.26, 1.26)
+        lattice_fa1.universes = matriz_fa1
+        lattice_fa1.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
+        lattice_fa1.outer = universo_agua_inf
+
+        celula_fa1 = openmc.Cell(name="Celula FA1", fill=lattice_fa1)
+        universo_19000 = openmc.Universe(cells=[celula_fa1, agua_celula])
+
+
+
+        ######################################################
+        ######################################################
+        #############     universo_31G16   ###################
+        ######################################################
+        ######################################################
+
+        C = self.universo_vareta_31       # Combustível 3.1%
+        G = self.universo_vareta_gadolina # Gadolina (16 varetas)
+        T = self.universo_tubo_guia       # Tubo de Guia
+        I = self.universo_tubo_guia       # Instrumentação
+
+        # Matriz 17x17 para o FA2 (16 varetas BP - Figura 3c)
+        matriz_fa2 = [
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, T, G, C, C, G, C, G, C, C, G, T, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, I, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, T, G, C, C, G, C, G, C, C, G, T, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
+        ]
+
+        lattice_fa2 = openmc.RectLattice(name='Elemento Combustivel FA2')
+        lattice_fa2.pitch = (1.26, 1.26)
+        lattice_fa2.universes = matriz_fa2
+        lattice_fa2.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
+        lattice_fa2.outer = universo_agua_inf
+
+        celula_fa2 = openmc.Cell(name="Celula FA2", fill=lattice_fa2)
+        universo_31G16 = openmc.Universe(cells=[celula_fa2,agua_celula])
+
+
+
+        ######################################################
+        ######################################################
+        #############   universo_31000G08   ##################
+        ######################################################
+        ######################################################
+
+
+        C = self.universo_vareta_31       # Combustível 3.1%
+        G = self.universo_vareta_gadolina # Gadolina (8 varetas)
+        T = self.universo_tubo_guia       # Tubo de Guia
+        I = self.universo_tubo_guia       # Instrumentação
+
+        # Matriz 17x17 para o FA5 (8 varetas BP - conforme Figura 3b)
+        matriz_fa5 = [
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, T, C, C, T, C, C, I, C, C, T, C, C, T, C, C],
+            [C, C, C, G, C, C, C, C, C, C, C, C, C, G, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, T, C, C, T, C, C, T, C, C, T, C, C, T, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, T, C, C, C, G, C, G, C, C, C, T, C, C, C],
+            [C, C, C, C, C, T, C, C, T, C, C, T, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C],
+            [C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C, C]
+        ]
+
+        lattice_fa5 = openmc.RectLattice(name='Elemento Combustivel FA5')
+        lattice_fa5.pitch = (1.26, 1.26)
+        lattice_fa5.universes = matriz_fa5
+        lattice_fa5.lower_left = [-1.26 * 17 / 2, -1.26 * 17 / 2]
+        lattice_fa5.outer = universo_agua_inf
+
+        celula_fa5 = openmc.Cell(name="Celula FA5", fill=lattice_fa5)
+        universo_31000G08 = openmc.Universe(cells=[celula_fa5, ])
+
+
+
+        ######################################################
+        ######################################################
+        #############    universo nucleo     #################
+        ######################################################
+        ######################################################
+
+
+        A = universo_agua
+        R = universo_RefRad
+        V = universo_31G08
+        C = universo_31000G16
+        M = universo_19000
+        Y = universo_31G16
+        T = universo_31000G08
 
         matriz_nucleo = [
             [A,A,A,R,R,R,R,R,A,A,A],
@@ -214,7 +484,7 @@ class modelo:
             [A,R,R,C,V,Y,V,C,R,R,A],
             [R,R,C,M,Y,C,Y,M,C,R,R],
             [R,V,V,Y,M,M,M,Y,V,V,R],
-            [R,V,Y,C,M,C,M,C,Y,V,R],
+            [R,V,Y,C,M,T,M,C,Y,V,R],
             [R,V,V,Y,M,M,M,Y,V,V,R],
             [R,R,C,M,Y,C,Y,M,C,R,R],
             [A,R,R,C,V,Y,V,C,R,R,A],
@@ -224,7 +494,7 @@ class modelo:
         ]
 
         lattice_nucleo = openmc.RectLattice()
-        lattice_nucleo.pitch = (3.5,3.5)
+        lattice_nucleo.pitch = (21.42,21.42)
         lattice_nucleo.universes = matriz_nucleo
         lattice_nucleo.lower_left = (- (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,     - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0)
         lattice_nucleo.outer = universo_agua_inf
