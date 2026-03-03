@@ -167,7 +167,7 @@ class modelo:
         ######################################################
 
         # Definições do pallet combustível (iguais para todas varetas e elementos combustíveis)
-        pallet_altura    = 1
+        pallet_altura    = 215
         pallet_raio      = 0.4095
         pallet_cilindro  = openmc.ZCylinder(r = pallet_raio)
         pallet_planoInf  = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
@@ -180,12 +180,16 @@ class modelo:
         gapRadial_raio      = 0.418
         gapRadial_cilindro  = openmc.ZCylinder(r = gapRadial_raio)
         # O gap axial fica 100% na parte superior (a naõ ser que tenha mola em baixo)
+        altura_plenum = 16.0         #  (espaço do gás no topo)
+        gapSuperior_planoInf = openmc.ZPlane(z0 = pallet_altura/2)
+        gapSuperior_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum)
+        gapSuperior_regiao = -gapRadial_cilindro & +gapSuperior_planoInf & -gapSuperior_planoSup
         #gapSuperior_raio
         #gapSuperior_planoSup
         #gapSuperior_planoInf
         #gapSuperior_regiao
         gapRadial_regiao    = +pallet_cilindro & -gapRadial_cilindro    & +pallet_planoInf & -pallet_planoSup # A limitação sup e inf do gapRadial é a mesma do pallet
-        gap_regiao          = gapRadial_regiao # + União com gapSuperior_regiao
+        gap_regiao          = gapRadial_regiao | gapSuperior_regiao
         gap_celula          = openmc.Cell(name="gap_celula", fill=self.m_helio, region=gap_regiao)
 
 
@@ -193,17 +197,28 @@ class modelo:
         revestimentoRadial_raio        = 0.475
         revestimentoRadial_comprimento = pallet_altura #Colocar aqui o comprimento total do revestimento
         revestimentoRadial_cilindro    = openmc.ZCylinder(r = revestimentoRadial_raio)
-        # Desenhar o revestimentoSup e revestimentoInf, isto é, o endplug. Seguir modelo do gap para facilitar
+        # Desenhar o revestimentoSup 
+        altura_revestimento_sup   = 3
+        revestimento_sup_planoInf = openmc.ZPlane(z0 = gapSuperior_planoSup.z0, boundary_type= 'reflective')
+        revestimento_sup_planoSup = openmc.ZPlane(z0 = gapSuperior_planoSup.z0 + altura_revestimento_sup, boundary_type= 'reflective')
+        revestimento_sup_regiao   = -revestimentoRadial_cilindro   & +revestimento_sup_planoInf & -revestimento_sup_planoSup
+        revestimento_sup_celula   = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_sup_regiao)
+        # Desenhar o revestimentoInf
+        altura_revestimento_inf   = 3
+        revestimento_inf_planoInf = openmc.ZPlane(z0 = pallet_planoInf.z0 - altura_revestimento_inf, boundary_type= 'reflective')
+        revestimento_inf_planoSup = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective')
+        revestimento_inf_regiao   = -revestimentoRadial_cilindro   & +revestimento_inf_planoInf & -revestimento_inf_planoSup
+        revestimento_inf_celula   = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_inf_regiao)
         # Não usar os planos do pallet, pois o revestimento é maior que os pallets
         revestimentoRadial_planoInf    = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
-        revestimentoRadial_planoSup    = openmc.ZPlane(z0 =  revestimentoRadial_comprimento/2, boundary_type= 'reflective')
+        revestimentoRadial_planoSup    = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum, boundary_type= 'reflective')
         revestimento_regiao            = +gapRadial_cilindro    & -revestimentoRadial_cilindro   & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup
         revestimento_celula            = openmc.Cell(name="revestimento_celula", fill=self.m_zircaloy, region=revestimento_regiao)
 
 
         # Definições do refrigerante ao redor do revestimento (iguais para todas varetas e elementos combustíveis)
         # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
-        refrigerente_regiao   = +revestimentoRadial_cilindro                      & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup      
+        refrigerente_regiao   = +revestimentoRadial_cilindro                      & +revestimento_inf_planoInf & -revestimento_sup_planoSup    
         refrigerente_celula   = openmc.Cell(name="refrigerente_celula", fill=self.m_agua, region=refrigerente_regiao)
 
 
@@ -215,7 +230,7 @@ class modelo:
             # Criando uma célula refrigerante que seja limitada apenas para o plot
             ## Detalhe: O limite XY da caixa é baseado no pitch da vareta
             limite_xy_plot = openmc.model.RectangularPrism(axis="z", width=pitch_varetas, height=pitch_varetas)
-            refrigerente_regiao_plot = +revestimentoRadial_cilindro & -limite_xy_plot & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup      
+            refrigerente_regiao_plot = +revestimentoRadial_cilindro & -limite_xy_plot & +revestimento_inf_planoInf & -revestimento_sup_planoSup      
             refrigerente_celula_plot = openmc.Cell(name="refrigerente_celula_plot", fill=self.m_agua, region=refrigerente_regiao_plot)
 
             # Criando um universo contendo
@@ -224,6 +239,10 @@ class modelo:
             vareta_universo_plot.add_cell(gap_celula)
             vareta_universo_plot.add_cell(revestimento_celula)
             vareta_universo_plot.add_cell(refrigerente_celula_plot)
+            vareta_universo_plot.add_cell(revestimento_sup_celula)
+            vareta_universo_plot.add_cell(revestimento_inf_celula)
+
+            
 
             # Criando uma geometria apenas para o plot
             geometria_vareta_plot = openmc.Geometry()
@@ -233,7 +252,14 @@ class modelo:
             pasta_plots = "plotInterno/vareta_combustível"
             mkdir(pasta_plots, data=False, chdir=False) #Crie a pasta mas não mude para dentro da pasta
             self.plotar(geometria=geometria_vareta_plot,filename=f"{pasta_plots}/centro_xy",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xy")
-            self.plotar(geometria=geometria_vareta_plot,filename=f"{pasta_plots}/centro_xz",width=(pitch_varetas,pitch_varetas),pixels=(500,500),basis="xz")
+            
+            # Calcule o centro real da vareta para o plot
+            z_topo_final = pallet_altura/2 + altura_plenum + altura_revestimento_sup
+            z_base_final = -pallet_altura/2 -altura_revestimento_inf
+            centro_da_vareta = (z_topo_final + z_base_final) / 2
+            altura_total_vareta = z_topo_final - z_base_final
+
+            self.plotar(geometria=geometria_vareta_plot, filename=f"{pasta_plots}/centro_xz", width=(pitch_varetas, altura_total_vareta + 2), origin=(0, 0, centro_da_vareta), pixels=(500, 1000), basis="xz")
             
         ######################################################
         ######################################################
