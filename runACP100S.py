@@ -22,7 +22,7 @@ libACP100S.verbose = True
 libACP100S.mkdir(nome=f"resultados", data=False) 
 
 reator = libACP100S.modelo()
-reator.geometria(plotar_interno=True)
+reator.geometria(plotar_interno=True, alturaBarra=2)
 reator.configuracoes(particulas=1000)
 reator.plotar(filename="reator_completo", width=(250,250),pixels=(10000,10000))
 #reator.plotar(filename="zoom1", width=(25,25),pixels=(5000,5000))
