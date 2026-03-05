@@ -244,6 +244,7 @@ class modelo:
         refrigerente_celula   = openmc.Cell(name="refrigerente_celula", fill=self.m_agua, region=refrigerente_regiao)
 
 
+
         # Plotando vareta completa para debug
         if plotar_interno:
             # Esta celula daqui serve apenas para plotar a geometria de uma vareta
@@ -361,7 +362,7 @@ class modelo:
         ######################################################
         
         # Estou pensando sobre isso ainda
-        universoAgua_regiao = +pallet_planoInf & -pallet_planoSup
+        universoAgua_regiao = +revestimento_inf_planoInf & -revestimento_sup_planoSup
         universoAgua_celula = openmc.Cell(name='Preenchimento com água',
                                 fill=self.m_agua,
                                 region=universoAgua_regiao)
@@ -376,7 +377,7 @@ class modelo:
         ######################################################
 
         # Sobre isso também
-        elementoRefRad_regiao   = +pallet_planoInf & -pallet_planoSup
+        elementoRefRad_regiao   = +revestimento_inf_planoInf & -revestimento_sup_planoSup
         elementoRefRad_celula   = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=elementoRefRad_regiao)
         elementoRefRad_universo = openmc.Universe(cells=[elementoRefRad_celula])
 
@@ -395,11 +396,12 @@ class modelo:
 
         # Criando universo Vareta Combustível com Enriquecimento de 1.9%
         elemento19000_pallet19_celula   = openmc.Cell(name="elemento19000_pallet19_celula", fill=self.m_uranio19, region= pallet_regiao)
+
         elemento19000_vareta_universo = openmc.Universe(name="elemento19000_vareta_universo")
         elemento19000_vareta_universo.add_cell(elemento19000_pallet19_celula)
-        elemento19000_vareta_universo.add_cell(gap_celula) #1° vez que está sendo usada essa célula, o resto tem que clonar
-        elemento19000_vareta_universo.add_cell(revestimento_celula) #1° vez que está sendo usada essa célula, o resto tem que clonar
-        elemento19000_vareta_universo.add_cell(refrigerente_celula) #1° vez que está sendo usada essa célula, o resto tem que clonar
+        elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_helio,    region=gap_regiao))
+        elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_zircaloy, region=revestimento_regiao))
+        elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_agua,     region=refrigerente_regiao))
         elemento19000_vareta_universo.add_cell(revestimento_sup_celula_elemento19000)
         elemento19000_vareta_universo.add_cell(revestimento_inf_celula_elemento19000)
 
@@ -491,7 +493,7 @@ class modelo:
             centro_z_v = (z_max_total + z_min_total) / 2
 
             # Plot XZ atualizado
-            self.plotar( geometria=elemento19000_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(2000, 5000))
+            self.plotar( geometria=elemento19000_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(500, 1000))
 
 
 
@@ -644,7 +646,7 @@ class modelo:
             self.plotar(geometria=elemento31G08_geometria_plot,filename=f"{pasta_fa}/centro_xy",basis="xy", width=(pitch_elementos, pitch_elementos),pixels=(5000, 5000))
             
             # Plot XZ (Vista lateral cortando o centro do elemento)
-            self.plotar( geometria=elemento31G08_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(2000, 5000))
+            self.plotar( geometria=elemento31G08_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(500, 1000))
 
 
         ######################################################
@@ -735,7 +737,7 @@ class modelo:
             
 
             # Plot XZ (Vista lateral cortando o centro do elemento)
-            self.plotar( geometria=elemento31000G08_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(2000, 5000))
+            self.plotar( geometria=elemento31000G08_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(500, 1000))
 
 
         ######################################################
@@ -828,7 +830,7 @@ class modelo:
             self.plotar(geometria=elemento31G16_geometria_plot,filename=f"{pasta_fa}/centro_xy",basis="xy", width=(pitch_elementos, pitch_elementos),pixels=(5000, 5000))
             
             # Plot XZ (Vista lateral cortando o centro do elemento)
-            self.plotar( geometria=elemento31G16_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(2000, 5000))
+            self.plotar( geometria=elemento31G16_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(500, 1000))
 
 
         ######################################################
@@ -866,7 +868,7 @@ class modelo:
         # Reutilizando as definições de varetas que criamos antes
         C = elemento31Gxx_vareta31_universo             # Combustível 3.1%
         G = elemento31Gxx_vareta31Gadolina_universo     # Gadolina (Agora serão 16 varetas)
-        T = guia_universo_31000G16                 # Tubo de Guia
+        T = guia_universo_31000G16                      # Tubo de Guia
         I = elemento31000G16_tuboGuia_universo          # Instrumentação
 
         # Matriz 17x17 para o FA4 (Disposição típica com 16 BP)
@@ -921,8 +923,9 @@ class modelo:
             # Plot XY (Vista superior do elemento 17x17)
             self.plotar(geometria=elemento31000G16_geometria_plot,filename=f"{pasta_fa}/centro_xy",basis="xy", width=(pitch_elementos, pitch_elementos),pixels=(5000, 5000))
             
-            # Plot XZ (Vista lateral cortando o centro do elemento)
-            self.plotar( geometria=elemento31000G16_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(2000, 5000))
+            # Plot XZ (Vista lateral cortando o centro do elemento) 
+            # Usar pixels=(6000, 15000) para melhor resolução do GAP
+            self.plotar( geometria=elemento31000G16_geometria_plot,filename=f"{pasta_fa}/centro_xz", basis="xz",  width=(pitch_elementos, altura_total_vareta ),origin=(0, 0, centro_z_v), pixels=(500, 1000))
         
 
 
@@ -973,7 +976,7 @@ class modelo:
 
         nucleo_raio = 120
         nucleo_cilindro = openmc.ZCylinder(r = nucleo_raio, boundary_type= 'vacuum')
-        regiao_nucleo   =   -nucleo_cilindro & +pallet_planoInf & -pallet_planoSup
+        regiao_nucleo = -nucleo_cilindro & +revestimento_inf_planoInf & -revestimento_sup_planoSup
 
         celula_nucleo = openmc.Cell(name="celula_nucleo", fill=lattice_nucleo, region=regiao_nucleo)
         universo_nucleo = openmc.Universe(cells=[celula_nucleo])
@@ -983,6 +986,34 @@ class modelo:
         self.lista_geometria.root_universe = universo_nucleo
         
 
+        # --- PLOTAGEM DO NÚCLEO INTEIRO (VISÃO LATERAL XZ) ---
+        if plotar_interno:
+            # 1. Definições de Dimensões
+            n_elementos_lado = 11  # Tamanho lateral do nucleo (número de EC)
+            largura_total_nucleo = n_elementos_lado * pitch_elementos
+            
+            # Alturas totais (usando os planos que você já definiu)
+            z_min_total = revestimento_inf_planoInf.z0
+            z_max_total = revestimento_sup_planoSup.z0
+            altura_total_projeto = z_max_total - z_min_total
+            centro_z_projeto = (z_max_total + z_min_total) / 2
+
+            # 2. Criar pasta para o núcleo
+            pasta_nucleo = "plotInterno/NUCLEO_COMPLETO"
+            mkdir(pasta_nucleo, data=False, chdir=False)
+
+            # 3. Executar o Plot XZ
+            print("Gerando Plot XZ do núcleo completo...")
+            self.plotar(
+                geometria = self.lista_geometria, 
+                filename  = f"{pasta_nucleo}/nucleo_xz_central",
+                basis     = "xz",
+                width     = (largura_total_nucleo, altura_total_projeto),
+                origin    = (0, 0, centro_z_projeto),
+                pixels    = (8000, 5000) 
+            )
+            
+ 
 
 
 
