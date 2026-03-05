@@ -164,10 +164,14 @@ class modelo:
 
 
 
-    def geometria(self, alturaBarra = 0, plotar_interno=False):
+    def geometria(self, alturaBarra = [0,0,0,0,0], plotar_interno=False):
         print("################################################")
         print("#######     Definição de Geometria        ######")
         print("################################################")
+
+        # Índices para a lista de alturas da barra 
+        # [FA_19000, FA_31G16, 31G08, 31000G16, 31000G08]
+
 
         # Estratégia de desenho:
         ## Superfícies e regiões podem ser reaproveitadas em mais de uma célula
@@ -276,7 +280,6 @@ class modelo:
             z_base_final = -pallet_altura/2 -altura_revestimento_inf
             centro_da_vareta = (z_topo_final + z_base_final) / 2
             altura_total_vareta = z_topo_final - z_base_final
-
             self.plotar(geometria=geometria_vareta_plot, filename=f"{pasta_plots}/centro_xz", width=(pitch_varetas, altura_total_vareta ), origin=(0, 0, centro_da_vareta), pixels=(500, 1000), basis="xz")
             
         ######################################################
@@ -285,6 +288,7 @@ class modelo:
         ######################################################
         ######################################################
 
+        
         # Definições do tubo guia da barra de controle (iguais para todos tubos guia, e também para o tubo de instrumentação)
         tuboGuiaRadial_raioInt = 0.5715
         tuboGuiaRadial_raioExt = 0.612
@@ -312,7 +316,7 @@ class modelo:
         # Definições da barra de controle
         barraControle_raio = 0.52
         barraControle_cilindro = openmc.ZCylinder(r=barraControle_raio)
-        plano_barra = openmc.ZPlane(z0=alturaBarra)
+        plano_barra = openmc.ZPlane(z0=alturaBarra[0])
         barraControle_regiao = -barraControle_cilindro & +plano_barra & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra
         gapBarra_regiao = +barraControle_cilindro & -tuboGuiaRadial_cilindroInt & +revestimento_inf_planoInf & -revestimento_sup_planoSup
@@ -407,7 +411,7 @@ class modelo:
 
      
         # Criando universo Tubo de Instrumentação
-        plano_barra_elemento19000 = openmc.ZPlane(z0=alturaBarra)
+        plano_barra_elemento19000 = openmc.ZPlane(z0=alturaBarra[0])
         barraControle_regiao = -barraControle_cilindro & +plano_barra_elemento19000 & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_elemento19000
 
@@ -483,7 +487,7 @@ class modelo:
             # Cálculo do centro e altura para enquadramento
             z_min_total = revestimento_inf_planoInf.z0
             z_max_total = revestimento_sup_planoSup.z0
-            altura_total_v = z_max_total - z_min_total
+            altura_total_vareta = z_max_total - z_min_total # Atualmente -> 237cm 
             centro_z_v = (z_max_total + z_min_total) / 2
 
             # Plot XZ atualizado
@@ -539,7 +543,7 @@ class modelo:
         guia_universo_elemento31Gxx.add_cell(barraControle_celula_elemento31Gxx)
         guia_universo_elemento31Gxx.add_cell(barraControle_agua_celula_elemento31Gxx)
         guia_universo_elemento31Gxx.add_cell(gapBarra_celula_elemento31Gxx)
-        guia_universo_elemento31Gxx.add_cell(refrigerenteTuboGuia_celula)
+        guia_universo_elemento31Gxx.add_cell(refrigerenteTuboGuia_celula.clone(clone_materials=False, clone_regions=False))
 
      
 
@@ -551,7 +555,7 @@ class modelo:
 
         # Criando universo Tubo de Instrumentação
 
-        plano_barra_31G08 = openmc.ZPlane(z0=alturaBarra)
+        plano_barra_31G08 = openmc.ZPlane(z0=alturaBarra[2])
         barraControle_regiao = -barraControle_cilindro & +plano_barra_31G08 & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31G08
 
@@ -565,7 +569,7 @@ class modelo:
         guia_universo_elemento31G08.add_cell(barraControle_celula_elemento31G08)
         guia_universo_elemento31G08.add_cell(barraControle_agua_celula_elemento31G08)
         guia_universo_elemento31G08.add_cell(gapBarra_celula_elemento31G08)
-        guia_universo_elemento31G08.add_cell(refrigerenteTuboGuia_celula)
+        guia_universo_elemento31G08.add_cell(refrigerenteTuboGuia_celula.clone(clone_materials=False, clone_regions=False))
 
 
 
@@ -651,7 +655,7 @@ class modelo:
 
 
         # Criando universo Tubo de Instrumentação
-        plano_barra_31000G08 = openmc.ZPlane(z0=alturaBarra)
+        plano_barra_31000G08 = openmc.ZPlane(z0=alturaBarra[4])
         barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G08 & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31000G08
 
@@ -665,7 +669,7 @@ class modelo:
         guia_universo_31000G08.add_cell(barraControle_celula_31000G08)
         guia_universo_31000G08.add_cell(barraControle_agua_celula_31000G08)
         guia_universo_31000G08.add_cell(gapBarra_celula_31000G08)
-        guia_universo_31000G08.add_cell(refrigerenteTuboGuia_celula)
+        guia_universo_31000G08.add_cell(refrigerenteTuboGuia_celula.clone(clone_materials=False, clone_regions=False))
 
         # Criando universo Tubo Guia para elemento 31000G08 (falta desenhar o restante da geometria da barra)
         elemento31000G08_tuboGuia_universo =  openmc.Universe(name="elemento31000G08_tuboGuia_universo")
@@ -742,7 +746,7 @@ class modelo:
 
         
         # Criando universo Tubo de Instrumentação
-        plano_barra_31G16  = openmc.ZPlane(z0=alturaBarra)
+        plano_barra_31G16  = openmc.ZPlane(z0=alturaBarra[1])
         barraControle_regiao = -barraControle_cilindro & +plano_barra_31G16 & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31G16
 
@@ -756,7 +760,7 @@ class modelo:
         guia_universo_31G16.add_cell(barraControle_celula_31G16)
         guia_universo_31G16.add_cell(barraControle_agua_celula_31G16)
         guia_universo_31G16.add_cell(gapBarra_celula_31G16)
-        guia_universo_31G16.add_cell(refrigerenteTuboGuia_celula)
+        guia_universo_31G16.add_cell(refrigerenteTuboGuia_celula.clone(clone_materials=False, clone_regions=False))
 
 
         # Criando universo Tubo Guia para elemento 31G16 (falta desenhar o restante da geometria da barra)
@@ -834,7 +838,7 @@ class modelo:
         ######################################################
 
         # Criando universo Tubo de Instrumentação
-        plano_barra_31000G16   = openmc.ZPlane(z0=alturaBarra)
+        plano_barra_31000G16   = openmc.ZPlane(z0=alturaBarra[3])
         barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G16 & -revestimento_sup_planoSup
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31000G16
 
@@ -848,7 +852,7 @@ class modelo:
         guia_universo_31000G16.add_cell(barraControle_celula_31000G16)
         guia_universo_31000G16.add_cell(barraControle_agua_celula_31000G16)
         guia_universo_31000G16.add_cell(gapBarra_celula_31000G16)
-        guia_universo_31000G16.add_cell(refrigerenteTuboGuia_celula)
+        guia_universo_31000G16.add_cell(refrigerenteTuboGuia_celula.clone(clone_materials=False, clone_regions=False))
 
         # 31G16 = Elemento com enriquecimento de 3.1% + 16 varetas dopadas com gadolina
 
@@ -967,7 +971,7 @@ class modelo:
         lattice_nucleo.lower_left = (- (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,     - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0)
         lattice_nucleo.outer = universoAgua_universo
 
-        nucleo_raio = 125
+        nucleo_raio = 120
         nucleo_cilindro = openmc.ZCylinder(r = nucleo_raio, boundary_type= 'vacuum')
         regiao_nucleo   =   -nucleo_cilindro & +pallet_planoInf & -pallet_planoSup
 
