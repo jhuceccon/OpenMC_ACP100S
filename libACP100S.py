@@ -161,6 +161,29 @@ class modelo:
         self.lista_materiais.append(self.m_clad_barra_controle)
         self.m_cores[self.m_clad_barra_controle] = "darkred"
 
+        # Material para o Vaso do Reator (Aço Carbono)
+        self.m_ferro = openmc.Material(name="Vaso do Reator - Carbon Steel")
+        self.m_ferro.add_element('Fe', 0.98, percent_type='wo')
+        self.m_ferro.add_element('C', 0.01, percent_type='wo')
+        self.m_ferro.add_element('Mn', 0.01, percent_type='wo')
+        self.m_ferro.set_density('g/cm3', 7.85)
+        self.lista_materiais.append(self.m_ferro)
+        self.m_cores[self.m_ferro] = (128, 128, 128)
+
+
+        # Material SS304 para o Baffle
+        self.m_ss304 = openmc.Material(name="Stainless Steel 304 - Baffle")
+        self.m_ss304.add_element('Fe', 0.70,  percent_type='wo')
+        self.m_ss304.add_element('Cr', 0.19,  percent_type='wo')
+        self.m_ss304.add_element('Ni', 0.09,  percent_type='wo')
+        self.m_ss304.add_element('Mn', 0.02,  percent_type='wo')
+        self.m_ss304.set_density('g/cm3', 8.0)
+        self.lista_materiais.append(self.m_ss304)
+        self.m_cores[self.m_ss304] = (192, 192, 192) # Cinza claro metálico
+
+
+
+
 
 
 
@@ -944,7 +967,6 @@ class modelo:
         ######################################################
         ######################################################
 
-
         A = universoAgua_universo
         R = elementoRefRad_universo
         V = elemento31G08_lattice_universo
@@ -965,55 +987,166 @@ class modelo:
             [A,R,R,C,V,Y,V,C,R,R,A],
             [A,A,R,R,V,V,V,R,R,A,A],
             [A,A,A,R,R,R,R,R,A,A,A]
-
         ]
 
+
+
+        # =====================================================================
+        # 1. LATTICE DO NÚCLEO
+        # =====================================================================
         lattice_nucleo = openmc.RectLattice()
-        lattice_nucleo.pitch = (pitch_elementos,pitch_elementos)
+        lattice_nucleo.pitch = (pitch_elementos, pitch_elementos)
         lattice_nucleo.universes = matriz_nucleo
-        lattice_nucleo.lower_left = (- (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,     - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0)
+        lattice_nucleo.lower_left = (
+            - (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,
+            - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0
+        )
         lattice_nucleo.outer = universoAgua_universo
 
-        nucleo_raio = 120
-        nucleo_cilindro = openmc.ZCylinder(r = nucleo_raio, boundary_type= 'vacuum')
-        regiao_nucleo = -nucleo_cilindro & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        # =====================================================================
+        # 2. DEFINIÇÃO DAS DIMENSÕES E RAIOS (Baseado no ACP100S)
+        # =====================================================================
+        # --- Eixo Z (Alturas) ---
+        altura_agua = 80.0     # Espaço de água acima e abaixo do núcleo (Plenums)
+        espessura_tampa = 20.0 # Espessura dos tampões de aço (Vaso Superior e Inferior)
 
-        celula_nucleo = openmc.Cell(name="celula_nucleo", fill=lattice_nucleo, region=regiao_nucleo)
-        universo_nucleo = openmc.Universe(cells=[celula_nucleo])
-
-        #lista_geometria.append(universo_elemento_comb)
-        self.lista_geometria = openmc.Geometry()
-        self.lista_geometria.root_universe = universo_nucleo
+        # --- Eixo XY (Raios Radiais) ---
+        nucleo_raio = 115.0  # Limite virtual do núcleo para caber nos internos
         
+        espessura_baffle = 2.52
+        baffle_raio_externo = nucleo_raio + espessura_baffle  # 117.52 cm
+        
+        barrel_raio_interno = 118.3  # Começa aqui, deixando um gap de água de 0.78 cm
+        espessura_barrel = 4.53
+        barrel_raio_externo = barrel_raio_interno + espessura_barrel  # 122.83 cm
+        
+        vaso_raio_interno = 130.0  # O Downcomer fica entre 122.83 cm e 130.0 cm
+        vaso_raio_externo = 150.0  # Parede do vaso de pressão de 20 cm
 
-        # --- PLOTAGEM DO NÚCLEO INTEIRO (VISÃO LATERAL XZ) ---
+        # =====================================================================
+        # 3. CRIAÇÃO DAS SUPERFÍCIES (Cilindros e Planos)
+        # =====================================================================
+        # --- Cilindros (Estrutura Radial) ---
+        s_nucleo = openmc.ZCylinder(r=nucleo_raio)
+        s_baffle = openmc.ZCylinder(r=baffle_raio_externo)
+        s_barrel_in = openmc.ZCylinder(r=barrel_raio_interno)
+        s_barrel_out = openmc.ZCylinder(r=barrel_raio_externo)
+        s_vaso_in = openmc.ZCylinder(r=vaso_raio_interno)
+        s_vaso_out = openmc.ZCylinder(r=vaso_raio_externo, boundary_type='vacuum')
+
+        # --- Planos (Estrutura Axial) ---
+        # 1. Limites da água (Plenums)
+        z_agua_inf = revestimento_inf_planoInf.z0 - altura_agua
+        z_agua_sup = revestimento_sup_planoSup.z0 + altura_agua
+        plano_agua_inf = openmc.ZPlane(z0=z_agua_inf)
+        plano_agua_sup = openmc.ZPlane(z0=z_agua_sup)
+        
+        # 2. Limites externos absolutos (Tampões de Ferro com condição de vácuo)
+        z_tampao_inf = z_agua_inf - espessura_tampa
+        z_tampao_sup = z_agua_sup + espessura_tampa
+        plano_tampao_inf = openmc.ZPlane(z0=z_tampao_inf, boundary_type='vacuum')
+        plano_tampao_sup = openmc.ZPlane(z0=z_tampao_sup, boundary_type='vacuum')
+
+        # =====================================================================
+        # 4. DEFINIÇÃO DAS CÉLULAS (Regiões Geométricas 3D)
+        # =====================================================================
+        # --- Regiões Centrais (Combustível e Água Superior/Inferior) ---
+        # O núcleo fica limitado pela altura das varetas (revestimento)
+        regiao_nucleo = -s_nucleo & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        celula_nucleo = openmc.Cell(name="celula_nucleo", fill=lattice_nucleo, region=regiao_nucleo)
+
+        # Plenums de água: vão da altura da vareta até o tampão de ferro, limitados pelo raio do vaso
+        regiao_agua_inf = +plano_agua_inf & -revestimento_inf_planoInf & -s_barrel_in
+        celula_agua_inf = openmc.Cell(name="agua_inferior", fill=self.m_agua, region=regiao_agua_inf)
+
+        regiao_agua_sup = +revestimento_sup_planoSup & -plano_agua_sup & -s_barrel_in
+        celula_agua_sup = openmc.Cell(name="agua_superior", fill=self.m_agua, region=regiao_agua_sup)
+
+        # --- Regiões Laterais (Internos e Vaso Radial) ---
+        # NOTA: Todas essas camadas sobem e descem junto com a água (plano_agua_inf e plano_agua_sup)
+        
+        regiao_baffle = +s_nucleo & -s_baffle & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        celula_baffle = openmc.Cell(name="baffle", fill=self.m_ss304, region=regiao_baffle)
+
+        regiao_gap = +s_baffle & -s_barrel_in & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        celula_gap = openmc.Cell(name="gap_agua", fill=self.m_agua, region=regiao_gap)
+
+        regiao_barrel = +s_barrel_in & -s_barrel_out & +plano_agua_inf & -plano_agua_sup
+        celula_barrel = openmc.Cell(name="barrel", fill=self.m_ss304, region=regiao_barrel)
+
+        regiao_downcomer = +s_barrel_out & -s_vaso_in & +plano_agua_inf & -plano_agua_sup
+        celula_downcomer = openmc.Cell(name="downcomer", fill=self.m_agua, region=regiao_downcomer)
+
+        regiao_vaso = +s_vaso_in & -s_vaso_out & +plano_agua_inf & -plano_agua_sup
+        celula_vaso = openmc.Cell(name="vaso_reator", fill=self.m_ferro, region=regiao_vaso)
+
+        # --- Regiões das Tampas (Limites Superiores e Inferiores do Reator) ---
+        # Tampas de aço carbono no topo e no fundo, indo até a borda externa do vaso
+        regiao_tampa_inf = +plano_tampao_inf & -plano_agua_inf & -s_vaso_out
+        celula_tampa_inf = openmc.Cell(name="tampa_inferior", fill=self.m_ferro, region=regiao_tampa_inf)
+
+        regiao_tampa_sup = +plano_agua_sup & -plano_tampao_sup & -s_vaso_out
+        celula_tampa_sup = openmc.Cell(name="tampa_superior", fill=self.m_ferro, region=regiao_tampa_sup)
+
+        # =====================================================================
+        # 5. MONTAGEM DO UNIVERSO E GEOMETRIA
+        # =====================================================================
+        universo_reator = openmc.Universe(cells=[
+            celula_nucleo,
+            celula_agua_inf,
+            celula_agua_sup, 
+            celula_baffle, 
+            celula_gap, 
+            celula_barrel, 
+            celula_downcomer, 
+            celula_vaso,
+            celula_tampa_inf,
+            celula_tampa_sup
+        ])
+
+        self.lista_geometria = openmc.Geometry()
+        self.lista_geometria.root_universe = universo_reator
+
+
+
+
+        # --- PLOTAGEM DO NÚCLEO INTEIRO (VISÃO LATERAL XZ E TOPO XY) ---
         if plotar_interno:
-            # 1. Definições de Dimensões
-            n_elementos_lado = 11  # Tamanho lateral do nucleo (número de EC)
-            largura_total_nucleo = n_elementos_lado * pitch_elementos
+            # 1. Ajustando para as dimensões reais do Vaso
+            vaso_raio_externo = 150.0 # Atualizado para bater com a geometria
+            largura_plot_total = vaso_raio_externo * 2.2 # 10% de margem nas laterais
             
-            # Alturas totais (usando os planos que você já definiu)
-            z_min_total = revestimento_inf_planoInf.z0
-            z_max_total = revestimento_sup_planoSup.z0
+            # 2. Pegando os limites REAIS de altura (Tampão de Ferro a Tampão de Ferro)
+            z_min_total = z_tampao_inf 
+            z_max_total = z_tampao_sup 
+            
             altura_total_projeto = z_max_total - z_min_total
-            centro_z_projeto = (z_max_total + z_min_total) / 2
+            centro_z_projeto = (z_max_total + z_min_total) / 2.0
 
-            # 2. Criar pasta para o núcleo
             pasta_nucleo = "plotInterno/NUCLEO_COMPLETO"
             mkdir(pasta_nucleo, data=False, chdir=False)
 
-            # 3. Executar o Plot XZ
-            print("Gerando Plot XZ do núcleo completo...")
+            print("Gerando Plot XZ do núcleo completo com Vaso e Tampões...")
             self.plotar(
                 geometria = self.lista_geometria, 
                 filename  = f"{pasta_nucleo}/nucleo_xz_central",
                 basis     = "xz",
-                width     = (largura_total_nucleo, altura_total_projeto),
+                # +40 na altura para garantir que as tampas de 20cm apareçam com folga
+                width     = (largura_plot_total, altura_total_projeto + 40), 
                 origin    = (0, 0, centro_z_projeto),
                 pixels    = (8000, 5000) 
             )
-            
- 
+
+            print("Gerando Plot XY do núcleo completo (Visão de Topo)...")
+            self.plotar(
+                geometria = self.lista_geometria, 
+                filename  = f"{pasta_nucleo}/nucleo_xy_central",
+                basis     = "xy",
+                width     = (largura_plot_total, largura_plot_total),
+                # A origem no centro do Z vai fazer o corte XY passar bem no meio do combustível
+                origin    = (0, 0, centro_z_projeto), 
+                pixels    = (5000, 5000) 
+            )
 
 
 
