@@ -207,64 +207,118 @@ class modelo:
 
         ######################################################
         ######################################################
-        ####  Definições gerais de uma vareta combustível ####
+        ###########   Definições gerais das varetas ##########
         ######################################################
         ######################################################
 
-        # Definições do pallet combustível (iguais para todas varetas e elementos combustíveis)
-        pallet_altura    = 215
+
+        ######################################################
+        ####        CONFIGURAÇÕES E DIMENSÕES             ####
+        ######################################################
+
+        # Dimensões do Pallet e Gap
         pallet_raio      = 0.4095
-        pallet_cilindro  = openmc.ZCylinder(r = pallet_raio)
-        pallet_planoInf  = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
-        pallet_planoSup  = openmc.ZPlane(z0 =  pallet_altura/2, boundary_type= 'reflective')
-        pallet_regiao    =                   -pallet_cilindro & +pallet_planoInf & -pallet_planoSup
-        # pallet_celula: cada célula do pallet será definida com um material diferente
-        
+        pallet_altura    = 215
+        gapRadial_raio   = 0.418
+        altura_plenum    = 16.0
 
-        # Definições do gap ao redor do pallet combustível (iguais para todas varetas e elementos combustíveis)
-        gapRadial_raio      = 0.418
-        gapRadial_cilindro  = openmc.ZCylinder(r = gapRadial_raio)
-        # O gap axial fica 100% na parte superior (a naõ ser que tenha mola em baixo)
-        altura_plenum = 16.0         #  (espaço do gás no topo)
+        # Dimensões do Revestimento (Cladding)
+        revestimentoRadial_raio        = 0.475
+        revestimentoRadial_comprimento = pallet_altura
+        altura_revestimento_sup        = 3
+        altura_revestimento_inf        = 3
+
+        # Dimensões do Vaso e Componentes Internos
+        vaso_raio_interno       = 130
+        vaso_raio_externo       = 150
+        nucleo_raio             = 110
+        baffle_raio_interno     = nucleo_raio
+        baffle_raio_externo     = nucleo_raio + 2.52
+        barrel_raio_interno     = 118.3
+        barrel_raio_externo     = barrel_raio_interno + 4.53
+
+
+        
+        ######################################################
+        ####        DEFINIÇÕES DE SUPERFÍCIES             ####
+        ######################################################
+
+        #### PLANOS ####
+        # Planos da Vareta
+        pallet_planoInf   = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type='reflective')
+        pallet_planoSup   = openmc.ZPlane(z0 =  pallet_altura/2, boundary_type='reflective')
         gapSuperior_planoInf = openmc.ZPlane(z0 = pallet_altura/2)
         gapSuperior_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum)
+
+        revestimento_sup_planoInf = openmc.ZPlane(z0 = gapSuperior_planoSup.z0, boundary_type='reflective')
+        revestimento_sup_planoSup = openmc.ZPlane(z0 = gapSuperior_planoSup.z0 + altura_revestimento_sup, boundary_type='reflective')
+        revestimento_inf_planoInf = openmc.ZPlane(z0 = pallet_planoInf.z0 - altura_revestimento_inf, boundary_type='reflective')
+        revestimento_inf_planoSup = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type='reflective')
+
+        revestimentoRadial_planoInf = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type='reflective')
+        revestimentoRadial_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum, boundary_type='reflective')
+
+        # Planos do Vaso
+        z_min_total_vareta = revestimento_inf_planoInf.z0
+        z_max_total_vareta = revestimento_sup_planoSup.z0
+        altura_total_vareta = z_max_total_vareta - z_min_total_vareta 
+        z_vaso_sup = gapSuperior_planoSup.z0 + altura_revestimento_sup + altura_total_vareta/2 + 20
+        z_vaso_inf = gapSuperior_planoSup.z0 + altura_revestimento_sup + altura_total_vareta/2 
+
+        plano_vaso_superior_sup = openmc.ZPlane(z0 = z_vaso_sup)
+        plano_vaso_superior_inf = openmc.ZPlane(z0 = z_vaso_inf)
+        plano_corte = revestimento_inf_planoInf
+
+        #### CILINDROS ####
+        # Cilindros da Vareta
+        pallet_cilindro             = openmc.ZCylinder(r = pallet_raio)
+        gapRadial_cilindro          = openmc.ZCylinder(r = gapRadial_raio)
+        revestimentoRadial_cilindro = openmc.ZCylinder(r = revestimentoRadial_raio)
+
+        # Cilindros do Vaso e Componentes Internos
+        vaso_cilindro_interno     = openmc.ZCylinder(r = vaso_raio_interno)
+        vaso_cilindro_externo     = openmc.ZCylinder(r = vaso_raio_externo)
+        nucleo_cilindro           = openmc.ZCylinder(r = nucleo_raio)
+        baffle_cilindro_interno   = openmc.ZCylinder(r = baffle_raio_interno)
+        baffle_cilindro_externo   = openmc.ZCylinder(r = baffle_raio_externo)
+        barrel_cilindro_interno   = openmc.ZCylinder(r = barrel_raio_interno)
+        barrel_cilindro_externo   = openmc.ZCylinder(r = barrel_raio_externo)
+
+        #### ESFERAS ####
+        z_centro_esfera = revestimento_inf_planoInf.z0 
+        esfera_externa = openmc.Sphere(r=vaso_raio_externo, z0=z_centro_esfera)
+        esfera_interna = openmc.Sphere(r=vaso_raio_interno, z0=z_centro_esfera)
+
+
+        ######################################################
+        ####        DEFINIÇÕES DE REGIÕES E CÉLULAS       ####
+        ######################################################
+
+        #### PALLET COMBUSTÍVEL ####
+        pallet_regiao = -pallet_cilindro & +pallet_planoInf & -pallet_planoSup
+        # pallet_celula: (Definir conforme o material específico na iteração)
+
+        #### GAP (HÉLIO) ####
+        gapRadial_regiao   = +pallet_cilindro & -gapRadial_cilindro & +pallet_planoInf & -pallet_planoSup
         gapSuperior_regiao = -gapRadial_cilindro & +gapSuperior_planoInf & -gapSuperior_planoSup
-        #gapSuperior_raio
-        #gapSuperior_planoSup
-        #gapSuperior_planoInf
-        #gapSuperior_regiao
-        gapRadial_regiao    = +pallet_cilindro & -gapRadial_cilindro    & +pallet_planoInf & -pallet_planoSup # A limitação sup e inf do gapRadial é a mesma do pallet
-        gap_regiao          = gapRadial_regiao | gapSuperior_regiao
-        gap_celula          = openmc.Cell(name="gap_celula", fill=self.m_helio, region=gap_regiao)
+        gap_regiao         = gapRadial_regiao | gapSuperior_regiao
+        gap_celula         = openmc.Cell(name="gap_celula", fill=self.m_helio, region=gap_regiao)
 
+        #### REVESTIMENTO LATERAL ####
+        revestimento_regiao = +gapRadial_cilindro & -revestimentoRadial_cilindro & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup
+        revestimento_celula = openmc.Cell(name="revestimento_celula", fill=self.m_zircaloy, region=revestimento_regiao)
 
-        # Definições do revestimento (iguais para todas varetas e elementos combustíveis)
-        revestimentoRadial_raio        = 0.475
-        revestimentoRadial_comprimento = pallet_altura #Colocar aqui o comprimento total do revestimento
-        revestimentoRadial_cilindro    = openmc.ZCylinder(r = revestimentoRadial_raio)
-        # Desenhar o revestimento Superior
-        altura_revestimento_sup   = 3
-        revestimento_sup_planoInf = openmc.ZPlane(z0 = gapSuperior_planoSup.z0, boundary_type= 'reflective')
-        revestimento_sup_planoSup = openmc.ZPlane(z0 = gapSuperior_planoSup.z0 + altura_revestimento_sup, boundary_type= 'reflective')
-        revestimento_sup_regiao   = -revestimentoRadial_cilindro   & +revestimento_sup_planoInf & -revestimento_sup_planoSup
-        revestimento_sup_celula   = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_sup_regiao)
-        # Desenhar o revestimento Inferior
-        altura_revestimento_inf   = 3
-        revestimento_inf_planoInf = openmc.ZPlane(z0 = pallet_planoInf.z0 - altura_revestimento_inf, boundary_type= 'reflective')
-        revestimento_inf_planoSup = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type= 'reflective')
-        revestimento_inf_regiao   = -revestimentoRadial_cilindro   & +revestimento_inf_planoInf & -revestimento_inf_planoSup
-        revestimento_inf_celula   = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_inf_regiao)
-        # Não usar os planos do pallet, pois o revestimento é maior que os pallets
-        revestimentoRadial_planoInf    = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type= 'reflective') #Temporariamente reflexivo, até desenhar o reator em 3D (desenhar a parte superior e inferior)
-        revestimentoRadial_planoSup    = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum, boundary_type= 'reflective')
-        revestimento_regiao            = +gapRadial_cilindro    & -revestimentoRadial_cilindro   & +revestimentoRadial_planoInf & -revestimentoRadial_planoSup
-        revestimento_celula            = openmc.Cell(name="revestimento_celula", fill=self.m_zircaloy, region=revestimento_regiao)
+        #### REVESTIMENTO SUPERIOR ####
+        revestimento_sup_regiao = -revestimentoRadial_cilindro & +revestimento_sup_planoInf & -revestimento_sup_planoSup
+        revestimento_sup_celula = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_sup_regiao)
 
+        #### REVESTIMENTO INFERIOR ####
+        revestimento_inf_regiao = -revestimentoRadial_cilindro & +revestimento_inf_planoInf & -revestimento_inf_planoSup
+        revestimento_inf_celula = openmc.Cell(name="revestimento_celula_inferior", fill=self.m_zircaloy, region=revestimento_inf_regiao)
 
-        # Definições do refrigerante ao redor do revestimento (iguais para todas varetas e elementos combustíveis)
-        # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
-        refrigerente_regiao   = +revestimentoRadial_cilindro                      & +revestimento_inf_planoInf & -revestimento_sup_planoSup    
-        refrigerente_celula   = openmc.Cell(name="refrigerente_celula", fill=self.m_agua, region=refrigerente_regiao)
+        #### REFRIGERANTE (MODERADOR) ####
+        refrigerente_regiao = +revestimentoRadial_cilindro & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        refrigerente_celula = openmc.Cell(name="refrigerente_celula", fill=self.m_agua, region=refrigerente_regiao)
 
 
 
@@ -312,43 +366,66 @@ class modelo:
         ######################################################
         ######################################################
 
-        
-        # Definições do tubo guia da barra de controle (iguais para todos tubos guia, e também para o tubo de instrumentação)
+        ######################################################
+        ####        CONFIGURAÇÕES E DIMENSÕES             ####
+        ######################################################
+
+        # Dimensões do Tubo Guia
         tuboGuiaRadial_raioInt = 0.5715
         tuboGuiaRadial_raioExt = 0.612
+
+        # Dimensões da Barra de Controle
+        barraControle_raio = 0.52
+        # alturaBarra deve ser passada como parâmetro (ex: self.alturaBarra[0])
+
+        ######################################################
+        ####        DEFINIÇÕES DE SUPERFÍCIES             ####
+        ######################################################
+
+        #### PLANOS ####
+        # Plano de altura da barra (ajustável)
+        plano_barra = openmc.ZPlane(z0=alturaBarra[0])
+
+        #### CILINDROS ####
+        # Cilindros do Tubo Guia
         tuboGuiaRadial_cilindroInt = openmc.ZCylinder(r=tuboGuiaRadial_raioInt)
         tuboGuiaRadial_cilindroExt = openmc.ZCylinder(r=tuboGuiaRadial_raioExt)
-        # Igual o revestimento, tem que desenhar a parte superior e inferior.
-        # Entretanto salvo engano ele deve ser aberto em baixo, e a parte superior tem o dobro do tamanho
-        tuboGuia_regiao = +tuboGuiaRadial_cilindroInt & -tuboGuiaRadial_cilindroExt & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+
+        # Cilindro da Barra de Controle
+        barraControle_cilindro = openmc.ZCylinder(r=barraControle_raio)
+
+        ######################################################
+        ####        DEFINIÇÕES DE REGIÕES E CÉLULAS       ####
+        ######################################################
+        z_topo_extensao = plano_vaso_superior_inf.z0
+
+        #### TUBO GUIA (ESTRUTURA) ####
+        tuboGuia_regiao = +tuboGuiaRadial_cilindroInt & -tuboGuiaRadial_cilindroExt & +revestimento_inf_planoInf & -plano_vaso_superior_inf
         tuboGuia_celula = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
 
-        # Definições do refrigerante ao redor do tubo guia (iguais para todos tubos guia, e também para o tubo de instrumentação)
-        # Definir a região do refrigerante como infinita externa ao revestimento em todas as direções (radialmente e axialmente)
-        refrigerenteTuboGuia_regiao   = +tuboGuiaRadial_cilindroExt                      & +revestimento_inf_planoInf & -revestimento_sup_planoSup      
-        refrigerenteTuboGuia_celula   = openmc.Cell(name="refrigerenteTuboGuia_celula", fill=self.m_agua, region=refrigerenteTuboGuia_regiao)
+        #### REFRIGERANTE AO REDOR DO TUBO GUIA ####
+        refrigerenteTuboGuia_regiao = +tuboGuiaRadial_cilindroExt & +revestimento_inf_planoInf & -plano_vaso_superior_inf
+        refrigerenteTuboGuia_celula = openmc.Cell(name="refrigerenteTuboGuia_celula", fill=self.m_agua, region=refrigerenteTuboGuia_regiao)
 
-        # Definições da barra de controle
-        # é preciso usar o parâmetro alturaBarra para definir a altura de um plano.
-        # Para baixo dele é agua, para cima é barra absorvedora
-        # Não esqueça do gap de água entre o tubo guia e a barra
-        # Depois a gente separa as barras em bancos e usa diferentes parâmetros (alturaBarraBanco1, alturaBarraBanco2, etc.) para controlar a altura de cada um
-        barraControle_aguaInf_regiao = -tuboGuiaRadial_cilindroInt & +revestimento_inf_planoInf & -revestimento_sup_planoSup
-        barraControle_aguaInf_celula = openmc.Cell(name="barraControle_aguaInf_celula", fill=self.m_agua, region=barraControle_aguaInf_regiao)
+        #### BARRA DE CONTROLE (MATERIAL ABSORVEDOR) ####
+        # Região acima do plano_barra dentro do cilindro da barra
+        barraControle_regiao = -barraControle_cilindro & +plano_barra & -plano_vaso_superior_inf
+        barraControle_celula = openmc.Cell(name="barraControle_celula", fill=self.m_barra_controle, region=barraControle_regiao)
 
-
-        # Definições da barra de controle
-        barraControle_raio = 0.52
-        barraControle_cilindro = openmc.ZCylinder(r=barraControle_raio)
-        plano_barra = openmc.ZPlane(z0=alturaBarra[0])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra & -revestimento_sup_planoSup
+        #### ÁGUA DENTRO DA BARRA (ABAIXO DO ABSORVEDOR) ####
+        # Região abaixo do plano_barra dentro do cilindro da barra
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra
-        gapBarra_regiao = +barraControle_cilindro & -tuboGuiaRadial_cilindroInt & +revestimento_inf_planoInf & -revestimento_sup_planoSup
-        barraControle_celula = openmc.Cell( name="barraControle_celula", fill=self.m_barra_controle, region=barraControle_regiao )
-        barraControle_agua_celula = openmc.Cell(name="barraControle_agua_celula",fill=self.m_agua,region=barraControle_agua_regiao)
-        gapBarra_celula = openmc.Cell(name="gapBarra_celula",fill=self.m_agua, region=gapBarra_regiao)
+        barraControle_agua_celula = openmc.Cell(name="barraControle_agua_celula", fill=self.m_agua, region=barraControle_agua_regiao)
 
+        #### GAP DE ÁGUA (ENTRE BARRA E TUBO GUIA) ####
+        # Região entre o raio da barra e o raio interno do tubo guia
+        gapBarra_regiao = +barraControle_cilindro & -tuboGuiaRadial_cilindroInt & +revestimento_inf_planoInf & -plano_vaso_superior_inf
+        gapBarra_celula = openmc.Cell(name="gapBarra_celula", fill=self.m_agua, region=gapBarra_regiao)
 
+        #### ÁGUA DO TUBO GUIA (OPCIONAL/TOTAL) ####
+        # Caso precise de uma célula que represente o interior do tubo guia sem a barra
+        barraControle_aguaInf_regiao = -tuboGuiaRadial_cilindroInt & +revestimento_inf_planoInf & -plano_vaso_superior_inf
+        barraControle_aguaInf_celula = openmc.Cell(name="barraControle_aguaInf_celula", fill=self.m_agua, region=barraControle_aguaInf_regiao)
 
 
 
@@ -387,7 +464,7 @@ class modelo:
         ######################################################
         
         # Estou pensando sobre isso ainda
-        universoAgua_regiao = +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        universoAgua_regiao = +revestimento_inf_planoInf & -plano_vaso_superior_inf
         universoAgua_celula = openmc.Cell(name='Preenchimento com água',
                                 fill=self.m_agua,
                                 region=universoAgua_regiao)
@@ -402,7 +479,7 @@ class modelo:
         ######################################################
 
         # Sobre isso também
-        elementoRefRad_regiao   = +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        elementoRefRad_regiao   = +revestimento_inf_planoInf & -plano_vaso_superior_inf
         elementoRefRad_celula   = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=elementoRefRad_regiao)
         elementoRefRad_universo = openmc.Universe(cells=[elementoRefRad_celula])
 
@@ -413,6 +490,10 @@ class modelo:
         #############     Elemento 19000   ###################
         ######################################################
         ######################################################
+
+        # Criando região de água que fica ACIMA do combustível até o topo do vaso
+        regiao_agua_extensao_vareta =   +revestimento_sup_planoSup & -plano_vaso_superior_inf
+        celula_agua_extensao_vareta_19000 = openmc.Cell(name="agua_ext_comb", fill=self.m_agua, region=regiao_agua_extensao_vareta)
 
 
         # Criando célula Revestimento
@@ -427,6 +508,7 @@ class modelo:
         elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_helio,    region=gap_regiao))
         elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_zircaloy, region=revestimento_regiao))
         elemento19000_vareta_universo.add_cell(openmc.Cell(fill=self.m_agua,     region=refrigerente_regiao))
+        elemento19000_vareta_universo.add_cell(celula_agua_extensao_vareta_19000)
         elemento19000_vareta_universo.add_cell(revestimento_sup_celula_elemento19000)
         elemento19000_vareta_universo.add_cell(revestimento_inf_celula_elemento19000)
 
@@ -439,7 +521,7 @@ class modelo:
      
         # Criando universo Tubo de Instrumentação
         plano_barra_elemento19000 = openmc.ZPlane(z0=alturaBarra[0])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra_elemento19000 & -revestimento_sup_planoSup
+        barraControle_regiao = -barraControle_cilindro & +plano_barra_elemento19000 & -plano_vaso_superior_inf
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_elemento19000
 
         tuboGuia_celula_elemento19000 = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
@@ -531,6 +613,8 @@ class modelo:
         # Criando célula Revestimento
         revestimento_sup_celula_elemento31Gxx  = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_sup_regiao)
         revestimento_inf_celula_elemento31Gxx  = openmc.Cell(name="revestimento_celula_superior", fill=self.m_zircaloy, region=revestimento_inf_regiao)
+        celula_agua_extensao_vareta_31Gxx = openmc.Cell(name="agua_ext_comb", fill=self.m_agua, region=regiao_agua_extensao_vareta)
+
 
         # Criando universo Vareta Combustível com Enriquecimento de 3.1%
         elemento31Gxx_pallet31_celula   = openmc.Cell(name="elemento31Gxx_pallet31_celula", fill=self.m_uranio31, region= pallet_regiao)
@@ -539,6 +623,7 @@ class modelo:
         elemento31Gxx_vareta31_universo.add_cell(gap_celula.clone(clone_materials=False, clone_regions=False))
         elemento31Gxx_vareta31_universo.add_cell(revestimento_celula.clone(clone_materials=False, clone_regions=False))
         elemento31Gxx_vareta31_universo.add_cell(refrigerente_celula.clone(clone_materials=False, clone_regions=False))
+        elemento31Gxx_vareta31_universo.add_cell(celula_agua_extensao_vareta_31Gxx)
         elemento31Gxx_vareta31_universo.add_cell(revestimento_sup_celula_elemento31Gxx)
         elemento31Gxx_vareta31_universo.add_cell(revestimento_inf_celula_elemento31Gxx)
 
@@ -583,7 +668,7 @@ class modelo:
         # Criando universo Tubo de Instrumentação
 
         plano_barra_31G08 = openmc.ZPlane(z0=alturaBarra[2])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra_31G08 & -revestimento_sup_planoSup
+        barraControle_regiao = -barraControle_cilindro & +plano_barra_31G08 & -plano_vaso_superior_inf
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31G08
 
         tuboGuia_celula_elemento31G08 = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
@@ -683,7 +768,7 @@ class modelo:
 
         # Criando universo Tubo de Instrumentação
         plano_barra_31000G08 = openmc.ZPlane(z0=alturaBarra[4])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G08 & -revestimento_sup_planoSup
+        barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G08 & -plano_vaso_superior_inf
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31000G08
 
         tuboGuia_celula_31000G08 = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
@@ -774,7 +859,7 @@ class modelo:
         
         # Criando universo Tubo de Instrumentação
         plano_barra_31G16  = openmc.ZPlane(z0=alturaBarra[1])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra_31G16 & -revestimento_sup_planoSup
+        barraControle_regiao = -barraControle_cilindro & +plano_barra_31G16 & -plano_vaso_superior_inf
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31G16
 
         tuboGuia_celula_31G16 = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
@@ -866,7 +951,7 @@ class modelo:
 
         # Criando universo Tubo de Instrumentação
         plano_barra_31000G16   = openmc.ZPlane(z0=alturaBarra[3])
-        barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G16 & -revestimento_sup_planoSup
+        barraControle_regiao = -barraControle_cilindro & +plano_barra_31000G16 & -plano_vaso_superior_inf
         barraControle_agua_regiao = -barraControle_cilindro & +revestimento_inf_planoInf & -plano_barra_31000G16
 
         tuboGuia_celula_31000G16 = openmc.Cell(name="tuboGuia_celula", fill=self.m_zircaloy, region=tuboGuia_regiao)
@@ -1006,42 +1091,6 @@ class modelo:
 
 
 
-        ################## Planos ###################################
-        z_min_total_vareta = revestimento_inf_planoInf.z0
-        z_max_total_vareta = revestimento_sup_planoSup.z0
-        altura_total_vareta = z_max_total_vareta - z_min_total_vareta 
-        z_vaso_sup = gapSuperior_planoSup.z0 + altura_revestimento_sup + altura_total_vareta/2 + 20
-        z_vaso_inf = gapSuperior_planoSup.z0 + altura_revestimento_sup + altura_total_vareta/2 
-        # Definição dos planos do vaso superior
-        plano_vaso_superior_sup = openmc.ZPlane(z0 = z_vaso_sup)
-        plano_vaso_superior_inf = openmc.ZPlane(z0 = z_vaso_inf)
-
-
-        ################# Cilindros ##################################
-        vaso_raio_interno = 130
-        vaso_raio_externo = 150
-        nucleo_raio = 110
-        baffle_raio_interno = nucleo_raio
-        baffle_raio_externo = nucleo_raio + 2.52
-        barrel_raio_interno = 118.3
-        barrel_raio_externo = barrel_raio_interno + 4.53
-        # Cilindros
-        vaso_cilindro_interno = openmc.ZCylinder(r = vaso_raio_interno)
-        vaso_cilindro_externo = openmc.ZCylinder(r = vaso_raio_externo)
-        nucleo_cilindro = openmc.ZCylinder(r = nucleo_raio)
-        baffle_cilindro_interno = openmc.ZCylinder(r=baffle_raio_interno)
-        baffle_cilindro_externo = openmc.ZCylinder(r=baffle_raio_externo)
-        barrel_cilindro_interno = openmc.ZCylinder(r=barrel_raio_interno)
-        barrel_cilindro_externo = openmc.ZCylinder(r=barrel_raio_externo)
-
-
-        #################### Esferas #################################
-        z_centro_esfera = revestimento_inf_planoInf.z0 
-        esfera_externa = openmc.Sphere(r=vaso_raio_externo, z0=z_centro_esfera)
-        esfera_interna = openmc.Sphere(r=vaso_raio_interno, z0=z_centro_esfera)
-        plano_corte = revestimento_inf_planoInf
-
-        
         ################# Tampão superior ############################
         # Região vaso superior
         regiao_vaso_superior = -vaso_cilindro_externo  &   +plano_vaso_superior_inf & -plano_vaso_superior_sup
@@ -1055,8 +1104,8 @@ class modelo:
 
 
         ################ Definição agua superior #####################
-        regiao_agua_superior_vaso =  -vaso_cilindro_interno   & +revestimento_sup_planoSup  &  -plano_vaso_superior_inf 
-        celula_agua_superior_vaso = openmc.Cell(name = "agua_superior_vaso", fill = self.m_agua, region = regiao_agua_superior_vaso)
+        #regiao_agua_superior_vaso =  -vaso_cilindro_interno   & +revestimento_sup_planoSup  &  -plano_vaso_superior_inf 
+        #celula_agua_superior_vaso = openmc.Cell(name = "agua_superior_vaso", fill = self.m_agua, region = regiao_agua_superior_vaso)
 
 
         ################ Definição Tampão inferior ####################
@@ -1074,25 +1123,30 @@ class modelo:
         celula_baffle = openmc.Cell( name = "baffle", fill = self.m_ss304, region = regiao_baffle)
 
 
+        ################# Agua do Baffle ate o topo ##################
+        regiao_agua_sobre_baffle = +baffle_cilindro_interno & -baffle_cilindro_externo & +revestimento_sup_planoSup & -plano_vaso_superior_inf
+        celula_agua_sobre_baffle = openmc.Cell(name="agua_sobre_baffle", fill=self.m_agua, region=regiao_agua_sobre_baffle)
+
+
         ######## Definição água entre o baffle e o vaso ##############
-        regiao_agua_baffle_barrel =  +baffle_cilindro_externo &  -barrel_cilindro_interno &  +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        regiao_agua_baffle_barrel =  +baffle_cilindro_externo &  -barrel_cilindro_interno &  +revestimento_inf_planoInf & -plano_vaso_superior_inf
         celula_agua_baffle_barrel = openmc.Cell( name="agua_downcomer", fill=self.m_agua, region=regiao_agua_baffle_barrel)
 
 
         #################### Definição barrel ########################
-        regiao_barrel =  +barrel_cilindro_interno &  -barrel_cilindro_externo &  +revestimento_inf_planoInf &  -revestimento_sup_planoSup
+        regiao_barrel =  +barrel_cilindro_interno &  -barrel_cilindro_externo &  +revestimento_inf_planoInf &  -plano_vaso_superior_inf
         celula_barrel = openmc.Cell(  name = "core_barrel", fill = self.m_ss304, region = regiao_barrel)
 
 
         ######## Definição água entre o barrel e o vaso ##############
-        regiao_agua_downcomer = +barrel_cilindro_externo & -vaso_cilindro_interno & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        regiao_agua_downcomer = +barrel_cilindro_externo & -vaso_cilindro_interno & +revestimento_inf_planoInf & -plano_vaso_superior_inf
         celula_agua_downcomer = openmc.Cell( name = "agua_downcomer", fill = self.m_agua, region = regiao_agua_downcomer)
 
         ################ Definição do núcleo #########################
-        regiao_nucleo = -nucleo_cilindro & +revestimento_inf_planoInf & -revestimento_sup_planoSup
+        regiao_nucleo = -nucleo_cilindro & +revestimento_inf_planoInf & -plano_vaso_superior_inf
         celula_nucleo = openmc.Cell(name="celula_nucleo", fill=lattice_nucleo, region = regiao_nucleo)
-        universo_nucleo = openmc.Universe(cells=[celula_nucleo, celula_vaso, celula_vaso_superior, celula_agua_superior_vaso,celula_vaso_inferior, celula_agua_inferior_vaso,
-                                                 celula_baffle, celula_agua_baffle_barrel, celula_barrel, celula_agua_downcomer])
+        universo_nucleo = openmc.Universe(cells=[celula_nucleo, celula_vaso, celula_vaso_superior, celula_vaso_inferior, celula_agua_inferior_vaso,
+                                                 celula_baffle, celula_agua_baffle_barrel, celula_barrel, celula_agua_downcomer, celula_agua_sobre_baffle])
 
  
         #lista_geometria.append(universo_elemento_comb)
@@ -1126,7 +1180,7 @@ class modelo:
                 basis     = "xz",
                 width     = (largura_total_nucleo, altura_total_projeto),
                 origin    = (0, 0, centro_z_projeto),
-                pixels    = (8000, 5000) 
+                pixels    = (8000, 8000) 
             )
 
 
