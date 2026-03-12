@@ -245,18 +245,18 @@ class modelo:
 
         #### PLANOS ####
         # Planos da Vareta
-        pallet_planoInf   = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type='reflective')
-        pallet_planoSup   = openmc.ZPlane(z0 =  pallet_altura/2, boundary_type='reflective')
+        pallet_planoInf   = openmc.ZPlane(z0 = -pallet_altura/2)
+        pallet_planoSup   = openmc.ZPlane(z0 =  pallet_altura/2)
         gapSuperior_planoInf = openmc.ZPlane(z0 = pallet_altura/2)
         gapSuperior_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum)
 
-        revestimento_sup_planoInf = openmc.ZPlane(z0 = gapSuperior_planoSup.z0, boundary_type='reflective')
-        revestimento_sup_planoSup = openmc.ZPlane(z0 = gapSuperior_planoSup.z0 + altura_revestimento_sup, boundary_type='reflective')
-        revestimento_inf_planoInf = openmc.ZPlane(z0 = pallet_planoInf.z0 - altura_revestimento_inf, boundary_type='reflective')
-        revestimento_inf_planoSup = openmc.ZPlane(z0 = -pallet_altura/2, boundary_type='reflective')
+        revestimento_sup_planoInf = openmc.ZPlane(z0 = gapSuperior_planoSup.z0)
+        revestimento_sup_planoSup = openmc.ZPlane(z0 = gapSuperior_planoSup.z0 + altura_revestimento_sup)
+        revestimento_inf_planoInf = openmc.ZPlane(z0 = pallet_planoInf.z0 - altura_revestimento_inf)
+        revestimento_inf_planoSup = openmc.ZPlane(z0 = -pallet_altura/2)
 
-        revestimentoRadial_planoInf = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2, boundary_type='reflective')
-        revestimentoRadial_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum, boundary_type='reflective')
+        revestimentoRadial_planoInf = openmc.ZPlane(z0 = -revestimentoRadial_comprimento/2)
+        revestimentoRadial_planoSup = openmc.ZPlane(z0 = pallet_altura/2 + altura_plenum)
 
         # Planos do Vaso
         z_min_total_vareta = revestimento_inf_planoInf.z0
@@ -279,7 +279,7 @@ class modelo:
         vaso_cilindro_interno     = openmc.ZCylinder(r = vaso_raio_interno)
         vaso_cilindro_externo     = openmc.ZCylinder(r = vaso_raio_externo)
         nucleo_cilindro           = openmc.ZCylinder(r = nucleo_raio)
-        baffle_cilindro_interno   = openmc.ZCylinder(r = baffle_raio_interno)
+        baffle_cilindro_interno   = openmc.ZCylinder(r = nucleo_raio)
         baffle_cilindro_externo   = openmc.ZCylinder(r = baffle_raio_externo)
         barrel_cilindro_interno   = openmc.ZCylinder(r = barrel_raio_interno)
         barrel_cilindro_externo   = openmc.ZCylinder(r = barrel_raio_externo)
@@ -468,7 +468,7 @@ class modelo:
         universoAgua_celula = openmc.Cell(name='Preenchimento com água',
                                 fill=self.m_agua,
                                 region=universoAgua_regiao)
-        universoAgua_universo = openmc.Universe(cells=[universoAgua_celula])
+        self.universoAgua_universo = openmc.Universe(cells=[universoAgua_celula])
         
 
 
@@ -481,7 +481,7 @@ class modelo:
         # Sobre isso também
         elementoRefRad_regiao   = +revestimento_inf_planoInf & -plano_vaso_superior_inf
         elementoRefRad_celula   = openmc.Cell(name='Refletor Radial', fill=self.m_agua, region=elementoRefRad_regiao)
-        elementoRefRad_universo = openmc.Universe(cells=[elementoRefRad_celula])
+        self.elementoRefRad_universo = openmc.Universe(cells=[elementoRefRad_celula])
 
 
 
@@ -567,10 +567,10 @@ class modelo:
         elemento19000_lattice.pitch = (pitch_varetas, pitch_varetas)
         elemento19000_lattice.universes = elemento19000_matriz
         elemento19000_lattice.lower_left = [-pitch_varetas * len(elemento19000_matriz) / 2, -pitch_varetas * len(elemento19000_matriz) / 2]
-        elemento19000_lattice.outer = universoAgua_universo
+        elemento19000_lattice.outer = self.universoAgua_universo
 
         elemento19000_lattice_celula = openmc.Cell(name="Celula FA1", fill=elemento19000_lattice)
-        elemento19000_lattice_universo = openmc.Universe(cells=[elemento19000_lattice_celula])
+        self.elemento19000_lattice_universo = openmc.Universe(cells=[elemento19000_lattice_celula])
 
         # Plotando o Elemento Combustível Completo (FA1)
         if plotar_interno:
@@ -639,6 +639,7 @@ class modelo:
         elemento31Gxx_vareta31Gadolina_universo.add_cell(gap_celula.clone(clone_materials=False, clone_regions=False))
         elemento31Gxx_vareta31Gadolina_universo.add_cell(revestimento_celula.clone(clone_materials=False, clone_regions=False))
         elemento31Gxx_vareta31Gadolina_universo.add_cell(refrigerente_celula.clone(clone_materials=False, clone_regions=False))
+        elemento31Gxx_vareta31Gadolina_universo.add_cell(celula_agua_extensao_vareta_31Gxx.clone(clone_materials=False, clone_regions=False))
         elemento31Gxx_vareta31Gadolina_universo.add_cell(revestimento_sup_celula_pallet31Gadolina)
         elemento31Gxx_vareta31Gadolina_universo.add_cell(revestimento_inf_celula_pallet31Gadolina)
 
@@ -728,10 +729,10 @@ class modelo:
         elemento31G08_lattice.pitch = (pitch_varetas, pitch_varetas) # Cell Pitch de 1.26 cm 
         elemento31G08_lattice.universes = elemento31G08_matriz
         elemento31G08_lattice.lower_left = [-pitch_varetas * len(elemento31G08_matriz) / 2, -pitch_varetas * len(elemento31G08_matriz) / 2]
-        elemento31G08_lattice.outer = universoAgua_universo
+        elemento31G08_lattice.outer = self.universoAgua_universo
 
         elemento31G08_lattice_celula = openmc.Cell(name="Celula FA3", fill=elemento31G08_lattice)
-        elemento31G08_lattice_universo = openmc.Universe(cells=[elemento31G08_lattice_celula])
+        self.elemento31G08_lattice_universo = openmc.Universe(cells=[elemento31G08_lattice_celula])
 
 
         # Plotando o Elemento Combustível Completo (FA1)
@@ -819,10 +820,10 @@ class modelo:
         elemento31000G08_lattice.pitch = (pitch_varetas, pitch_varetas)
         elemento31000G08_lattice.universes = elemento31000G08_matriz
         elemento31000G08_lattice.lower_left = [-pitch_varetas * len(elemento31000G08_matriz) / 2, -pitch_varetas * len(elemento31000G08_matriz) / 2]
-        elemento31000G08_lattice.outer = universoAgua_universo
+        elemento31000G08_lattice.outer = self.universoAgua_universo
 
         elemento31000G08_celula = openmc.Cell(name="Celula FA5", fill=elemento31000G08_lattice)
-        elemento31000G08_lattice_universo = openmc.Universe(cells=[elemento31000G08_celula ])
+        self.elemento31000G08_lattice_universo = openmc.Universe(cells=[elemento31000G08_celula ])
 
         # Plotando o Elemento Combustível Completo (FA1)
         if plotar_interno:
@@ -912,10 +913,10 @@ class modelo:
         elemento31G16_lattice.pitch = (pitch_varetas, pitch_varetas)
         elemento31G16_lattice.universes = elemento31G16_matriz
         elemento31G16_lattice.lower_left =  [-pitch_varetas * len(elemento31G16_matriz) / 2, -pitch_varetas * len(elemento31G16_matriz) / 2]
-        elemento31G16_lattice.outer = universoAgua_universo
+        elemento31G16_lattice.outer = self.universoAgua_universo
 
         elemento31G16_lattice_celula = openmc.Cell(name="Celula FA2", fill=elemento31G16_lattice)
-        elemento31G16_lattice_universo = openmc.Universe(cells=[elemento31G16_lattice_celula])
+        self.elemento31G16_lattice_universo = openmc.Universe(cells=[elemento31G16_lattice_celula])
 
 
         # Plotando o Elemento Combustível Completo (FA1)
@@ -1006,10 +1007,10 @@ class modelo:
         elemento31000G16_lattice.pitch = (pitch_varetas, pitch_varetas)
         elemento31000G16_lattice.universes = elemento31G16_matriz
         elemento31000G16_lattice.lower_left = [-pitch_varetas * len(elemento31G16_matriz) / 2, -pitch_varetas * len(elemento31G16_matriz) / 2]
-        elemento31000G16_lattice.outer = universoAgua_universo
+        elemento31000G16_lattice.outer = self.universoAgua_universo
 
         elemento31000G16_lattice_celula = openmc.Cell(name="Celula FA4", fill=elemento31000G16_lattice)
-        elemento31000G16_lattice_universo = openmc.Universe(cells=[elemento31000G16_lattice_celula])
+        self.elemento31000G16_lattice_universo = openmc.Universe(cells=[elemento31000G16_lattice_celula])
 
 
         # Plotando o Elemento Combustível Completo (FA1)
@@ -1054,13 +1055,13 @@ class modelo:
         ######################################################
         ######################################################
 
-        A = universoAgua_universo
-        R = elementoRefRad_universo
-        V = elemento31G08_lattice_universo
-        C = elemento31000G16_lattice_universo
-        M = elemento19000_lattice_universo
-        Y = elemento31G16_lattice_universo
-        T = elemento31000G08_lattice_universo
+        A = self.universoAgua_universo
+        R = self.elementoRefRad_universo
+        V = self.elemento31G08_lattice_universo
+        C = self.elemento31000G16_lattice_universo
+        M = self.elemento19000_lattice_universo
+        Y = self.elemento31G16_lattice_universo
+        T = self.elemento31000G08_lattice_universo
 
         matriz_nucleo = [
             [A,A,A,R,R,R,R,R,A,A,A],
@@ -1086,8 +1087,12 @@ class modelo:
             - (len(lattice_nucleo.universes[0]) * lattice_nucleo.pitch[0]) / 2.0,
             - (len(lattice_nucleo.universes) * lattice_nucleo.pitch[1]) / 2.0
         )
-        lattice_nucleo.outer = universoAgua_universo
+        lattice_nucleo.outer = self.universoAgua_universo
 
+
+        vaso_cilindro_externo.boundary_type = 'vacuum'
+        plano_vaso_superior_sup.boundary_type = 'vacuum'
+        esfera_externa.boundary_type = 'vacuum'
 
 
 
@@ -1145,13 +1150,13 @@ class modelo:
         ################ Definição do núcleo #########################
         regiao_nucleo = -nucleo_cilindro & +revestimento_inf_planoInf & -plano_vaso_superior_inf
         celula_nucleo = openmc.Cell(name="celula_nucleo", fill=lattice_nucleo, region = regiao_nucleo)
-        universo_nucleo = openmc.Universe(cells=[celula_nucleo, celula_vaso, celula_vaso_superior, celula_vaso_inferior, celula_agua_inferior_vaso,
+        self.universo_nucleo = openmc.Universe(cells=[celula_nucleo, celula_vaso, celula_vaso_superior, celula_vaso_inferior, celula_agua_inferior_vaso,
                                                  celula_baffle, celula_agua_baffle_barrel, celula_barrel, celula_agua_downcomer, celula_agua_sobre_baffle])
 
  
         #lista_geometria.append(universo_elemento_comb)
         self.lista_geometria = openmc.Geometry()
-        self.lista_geometria.root_universe = universo_nucleo
+        self.lista_geometria.root_universe = self.universo_nucleo
 
 
 
@@ -1185,10 +1190,70 @@ class modelo:
 
 
 
-    def contagens(self):
-        print("################################################")
-        print("#######     Definição de Contagens        ######")
-        print("################################################")
+
+    ###########################################################
+    ############ Definição e obtenção dos Tallies  ############
+    ###########################################################
+
+    def contagens(self, init=False, export=False):
+        """Gerencia a inicialização e exportação do arquivo tallies.xml"""
+        if init and export:
+            print("Erro de configuração de tallies! Encerrando...")
+            return
+
+        if init:
+            self.Tallies = openmc.Tallies()
+
+        if export:
+            self.Tallies.export_to_xml()
+
+    def contagem_espectro_por_material(
+            self,
+            universo_macro, # Ex: self.elemento19000_lattice_universo
+            material_alvo,  # Ex: self.m_uranio19 ou self.m_agua
+            get     = False,
+            file    = None,
+            energia = None,
+            nome    = "espectro",
+            score   = "flux"
+            ):
+        """Cria um tally filtrando por Universo e por Material simultaneamente."""
+        
+        if not get:
+            tally = openmc.Tally(name=nome)
+            
+            # Filtro 1: Apenas dentro do Universo escolhido (ex: Elemento FA1)
+            tally.filters.append(openmc.UniverseFilter(universo_macro))
+            
+            # Filtro 2: Apenas no material escolhido (ex: Urânio ou Água)
+            tally.filters.append(openmc.MaterialFilter(material_alvo))
+            
+            # Filtro 3: Divisão por grupos de energia
+            if energia is not None:
+                tally.filters.append(openmc.EnergyFilter(energia))
+                
+            tally.scores.append(score)
+            self.Tallies.append(tally)
+            
+        else:
+            # Pós-processamento: Extrair os dados depois que a simulação acabou
+            if file == None:
+                sp = openmc.StatePoint(f"statepoint.{self.settings.batches}.h5")
+            else:
+                sp = openmc.StatePoint(file)
+            
+            value         = sp.get_tally(scores=[score], name=nome)
+            value_mean    = [float(elemento[0][0]) for elemento in value.mean]
+            value_std_dev = [float(elemento[0][0]) for elemento in value.std_dev]
+            
+            sp.close()
+            return value_mean, value_std_dev
+ 
+
+
+
+
+
 
 
 
@@ -1236,6 +1301,11 @@ class modelo:
 
 
 
+
+
+
+
+
     def configuracoes(
         self,
         particulas = 1000,
@@ -1250,7 +1320,7 @@ class modelo:
         self.settings.batches = ciclos
         self.settings.inactive = inativos
         self.settings.source = openmc.IndependentSource(space=openmc.stats.Point())
-        self.settings.output = {'tallies': False}
+        self.settings.output = {'tallies': True}
         
 
     def simular(self):
