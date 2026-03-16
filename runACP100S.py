@@ -33,12 +33,14 @@ reator = libACP100S.modelo()
 ##################### Geometria e Posicionamento das Barras #####################
 #################################################################################
 
+PALLET_ALTURA   = 245     # cm  — altura ativa do combustível (pellets)
 # Índices: [FA_19000, FA_31G16, 31G08, 31000G16, 31000G08]
-alturas_barras = [-118.5, 118.5, -100, 100, 75]
+alturas_barras = [PALLET_ALTURA, PALLET_ALTURA, PALLET_ALTURA, PALLET_ALTURA, PALLET_ALTURA]
 reator.geometria(plotar_interno=interno, alturaBarra=alturas_barras)
 
 # Configurações de transporte de partículas
-reator.configuracoes(particulas=1000)
+N_PARTICULAS, N_CICLOS, N_INATIVOS, N_BINS_Z = 100, 50, 5, 20
+reator.configuracoes(particulas=N_PARTICULAS, ciclos=N_CICLOS, inativos=N_INATIVOS)
 
 
 #################################################################################
@@ -54,26 +56,17 @@ intervalos_energias = np.logspace(-3, 7, 1024)
 #####################     Configuração de Tallies (Física)    ###################
 #################################################################################
 
-# Inicializa a lista de tallies
 reator.contagens(init=True)
 
-# 1. Espectro no Combustível (Material Uranio 19)
-reator.contagem_espectro_por_material(
-    universo_macro = reator.elemento19000_lattice_universo, 
-    material_alvo  = reator.m_uranio19, 
-    energia        = intervalos_energias,
-    nome           = "espectroFluxoCombustivel"
-)
+# 1. Chama a função original (que vai criar a malha com erro de tamanho)
+reator.configurar_tallies_3d(n_bins_z=N_BINS_Z)
 
-# 2. Espectro na Água (Moderador)
-reator.contagem_espectro_por_material(
-    universo_macro = reator.elemento19000_lattice_universo, 
-    material_alvo  = reator.m_agua, 
-    energia        = intervalos_energias,
-    nome           = "espectroAguaEntreVaretas"
-)
+# 2. CORREÇÃO MANUAL: Forçamos os limites para os 9 elementos (aprox. 97cm)
+# Acessamos o objeto da malha dentro do reator e alteramos os cantos
+L_NUCLEO = 97.0
+reator._mesh_ref.lower_left  = [-L_NUCLEO, -L_NUCLEO, -107.5]
+reator._mesh_ref.upper_right = [ L_NUCLEO,  L_NUCLEO,  107.5]
 
-# Finaliza e exporta para tallies.xml
 reator.contagens(export=True)
 
 
@@ -85,93 +78,47 @@ reator.plotar(filename="reator_completo", width=(300,300), pixels=(800,800))
 reator.simular()
 
 
+
 #################################################################################
-#####################     Extração de Dados Pós-Simulação     ###################
+#####################     Extração e Processamento de Dados     #################
 #################################################################################
+
+POTENCIA_NOMINAL = 350e6    # 350 MWt
+Z_INF, Z_SUP     = -107.5, 107.5
+ALTURA_ATIVA_CM  = Z_SUP - Z_INF 
 
 if libACP100S.simu:
-    print("\nExtraindo resultados dos arquivos de saída...")
+    print("\nExtraindo e normalizando dados para 350 MWt...")
     
-    # Extração dos valores de fluxo e erro para o Combustível
-    fluxo_comb, erro_comb = reator.contagem_espectro_por_material(
-        universo_macro = reator.universo_nucleo,  
-        material_alvo  = reator.m_uranio19,             
-        get=True, 
-        nome="espectroFluxoCombustivel"
-    )
-    
-    # Extração dos valores de fluxo e erro para a Água
-    fluxo_agua, erro_agua = reator.contagem_espectro_por_material(
-        universo_macro = reator.universo_nucleo,  
-        material_alvo  = reator.m_agua,            
-        get=True, 
-        nome="espectroAguaEntreVaretas"
-    )
+    # Extração das matrizes normalizadas e coordenadas
+    fluxo, potencia_watts, coords = reator.extrair_dados_normalizados(potencia_ref=POTENCIA_NOMINAL)
 
-    # Exibindo os primeiros valores para conferência rápida no terminal
-    print(f"\n✅ Extração realizada com sucesso!")
-    print(f"Total de pontos de energia: {len(fluxo_comb)}")
-    print(f"Primeiros valores de fluxo (Combustível): {fluxo_comb[:3]}")
-    print(f"Primeiros valores de fluxo (Água):        {fluxo_agua[:3]}")
-    print("="*50)
+    # Cálculo da Potência Linear (W/cm)
+    dz_cm = ALTURA_ATIVA_CM / N_BINS_Z
+    potencia_w_cm = potencia_watts / dz_cm
+
+    # Ajuste para o Visualizador PyQt5 (Compensação do fator 0.1 da interface)
+    # Salvamos (W/cm ) para que a leitura final resulte em kW/m
+    potencia_para_visualizador = potencia_w_cm 
 
 
 
 
 #################################################################################
-#####################       Geração de Gráfico (Visualização)  ###################
+#####################    Salvamento das Matrizes (NPY)      ###################
 #################################################################################
 
-import matplotlib.pyplot as plt
+    print("Salvando matrizes tridimensionais em /Dados...")
 
-if libACP100S.simu:
-    plt.figure(figsize=(10, 6))
-    
-    # Plotando os dados
-    # Usamos intervalos_energias[:-1] porque o fluxo é calculado entre os intervalos
-    plt.step(intervalos_energias[:-1], fluxo_comb, where='post', label='Fluxo no Combustível')
-    plt.step(intervalos_energias[:-1], fluxo_agua, where='post', label='Fluxo na Água')
-    
-    # Configurações de escala e labels
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('Energia [eV]')
-    plt.ylabel('Fluxo [n/cm².s]')
-    plt.title('Espectro de Energia Neutrônica - ACP100S')
-    plt.grid(True, which="both", ls="-", alpha=0.5)
-    plt.legend()
-    
-    # Salva o gráfico
-    plt.savefig("espectro_energia.png", dpi=300)
-    print("✅ Gráfico 'espectro_energia.png' gerado com sucesso!")
-    plt.show()
+    # --- ADICIONE ESTAS DUAS LINHAS AQUI ---
+    os.makedirs("Dados", exist_ok=True) 
+    # (O exist_ok=True garante que ele não dê erro se a pasta já existir nas próximas vezes)
 
+    # Salvamento dos dados principais
+    np.save("Dados/Fluxo_ncm2s_3D.npy", fluxo)
+    np.save("Dados/Potencia_W_cm_3D.npy", potencia_para_visualizador)
 
-
-#################################################################################
-#####################      Exportação para Arquivo EXCEL      ###################
-#################################################################################
-
-import pandas as pd
-
-if libACP100S.simu:
-    print("\nGerando planilha Excel...")
-    
-    # Criando o dicionário com os dados extraídos
-    # Nota: usamos intervalos_energias[:-1] para alinhar com o tamanho dos fluxos
-    dados = {
-        'Energia [eV]': intervalos_energias[:-1],
-        'Fluxo (Combustível)': fluxo_comb,
-        'Erro Relativo (Comb.)': erro_comb,
-        'Fluxo (Água)': fluxo_agua,
-        'Erro Relativo (Água)': erro_agua
-    }
-    
-    # Criando o DataFrame (Tabela)
-    df = pd.DataFrame(dados)
-    
-    # Exportando para Excel (.xlsx)
-    nome_arquivo = "resultados_simulacao_ACP100S.xlsx"
-    df.to_excel(nome_arquivo, index=False, engine='openpyxl')
-    
-    print(f"✅ Dados exportados com sucesso para: {nome_arquivo}")
+    # Salvamento dos eixos de referência
+    np.save("Dados/Eixo_X_cm.npy", coords['x'])
+    np.save("Dados/Eixo_Y_cm.npy", coords['y'])
+    np.save("Dados/Eixo_Z_cm.npy", coords['z'])

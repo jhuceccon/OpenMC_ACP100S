@@ -1,1 +1,0 @@
-# OpenMC_ACP100S

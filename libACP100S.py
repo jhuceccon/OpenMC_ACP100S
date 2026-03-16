@@ -15,6 +15,7 @@ import openmc
 import openmc.model
 from datetime import datetime
 import os
+import numpy as np
 
 # Criar pasta e mudar para a pasta criada:
 def mkdir(nome="teste_sem_nome",data=True,voltar=False,chdir=True):
@@ -1191,64 +1192,102 @@ class modelo:
 
 
 
+
+
+
+
     ###########################################################
     ############ Definição e obtenção dos Tallies  ############
     ###########################################################
 
+    # 1. MANTÉM ESTE: É essencial para criar o ficheiro tallies.xml
     def contagens(self, init=False, export=False):
-        """Gerencia a inicialização e exportação do arquivo tallies.xml"""
         if init and export:
-            print("Erro de configuração de tallies! Encerrando...")
+            print("Erro de configuração de tallies!")
             return
-
         if init:
             self.Tallies = openmc.Tallies()
-
         if export:
             self.Tallies.export_to_xml()
 
-    def contagem_espectro_por_material(
-            self,
-            universo_macro, # Ex: self.elemento19000_lattice_universo
-            material_alvo,  # Ex: self.m_uranio19 ou self.m_agua
-            get     = False,
-            file    = None,
-            energia = None,
-            nome    = "espectro",
-            score   = "flux"
-            ):
-        """Cria um tally filtrando por Universo e por Material simultaneamente."""
+
+    # 2. ADICIONA/ATUALIZA ESTE: Para configurar a malha 3D de Fluxo e Potência
+    def configurar_tallies_3d(self, n_bins_z=20):
+        PITCH_VARETAS   = 1.26  
+        PALLET_ALTURA   = 215.0 
+        N_VARETAS_FA    = 17        # varetas por lado em cada FA
+        N_FA_NUCLEO     = 11        # FAs por lado no lattice do núcleo
+        N_BINS_XY = N_FA_NUCLEO * N_VARETAS_FA   # 187
+        MESH_HALF_XY = N_BINS_XY * PITCH_VARETAS / 2.0   # 117.81 cm
+        Z_ATIVO_INF     = -PALLET_ALTURA / 2   # -107.5 cm
+        Z_ATIVO_SUP     =  PALLET_ALTURA / 2   #  107.5 cm
+        # Definição da malha única para ambos
+        mesh = openmc.RegularMesh(name="mesh_nucleo")
+        mesh.dimension   = [N_BINS_XY, N_BINS_XY, n_bins_z]
+        mesh.lower_left  = [-MESH_HALF_XY, -MESH_HALF_XY, Z_ATIVO_INF]
+        mesh.upper_right = [ MESH_HALF_XY,  MESH_HALF_XY, Z_ATIVO_SUP]
         
-        if not get:
-            tally = openmc.Tally(name=nome)
-            
-            # Filtro 1: Apenas dentro do Universo escolhido (ex: Elemento FA1)
-            tally.filters.append(openmc.UniverseFilter(universo_macro))
-            
-            # Filtro 2: Apenas no material escolhido (ex: Urânio ou Água)
-            tally.filters.append(openmc.MaterialFilter(material_alvo))
-            
-            # Filtro 3: Divisão por grupos de energia
-            if energia is not None:
-                tally.filters.append(openmc.EnergyFilter(energia))
-                
-            tally.scores.append(score)
-            self.Tallies.append(tally)
-            
-        else:
-            # Pós-processamento: Extrair os dados depois que a simulação acabou
-            if file == None:
-                sp = openmc.StatePoint(f"statepoint.{self.settings.batches}.h5")
-            else:
-                sp = openmc.StatePoint(file)
-            
-            value         = sp.get_tally(scores=[score], name=nome)
-            value_mean    = [float(elemento[0][0]) for elemento in value.mean]
-            value_std_dev = [float(elemento[0][0]) for elemento in value.std_dev]
-            
-            sp.close()
-            return value_mean, value_std_dev
- 
+        self._mesh_ref = mesh 
+
+        # Filtros
+        filtro_mats = openmc.MaterialFilter([
+            self.m_uranio19, self.m_uranio31, self.m_uranio31_gadolina
+        ])
+        filtro_mesh = openmc.MeshFilter(mesh)
+
+        # Tally de FLUXO
+        t_fluxo = openmc.Tally(name="tally_fluxo")
+        t_fluxo.filters = [filtro_mesh, filtro_mats]
+        t_fluxo.scores  = ["flux"]
+        self.Tallies.append(t_fluxo)
+
+        # Tally de POTÊNCIA
+        t_pot = openmc.Tally(name="tally_potencia")
+        t_pot.filters = [filtro_mesh, filtro_mats]
+        t_pot.scores  = ["kappa-fission"]
+        self.Tallies.append(t_pot)
+
+    # 3. ADICIONA ESTE: Para processar os resultados e aplicar os 350 MWt
+    def extrair_dados_normalizados(self, potencia_ref=350e6):
+
+        sp = openmc.StatePoint(f"statepoint.{self.settings.batches}.h5")
+        # keff = sp.keff.n # Pode remover ou comentar, não será usado para normalizar a termo-hidráulica
+        EV_J = 1.60218e-19
+        
+        nz, ny, nx = self._mesh_ref.dimension[2], self._mesh_ref.dimension[1], self._mesh_ref.dimension[0]
+        shape_bruto = (nz, ny, nx, 3) 
+
+        # --- CÁLCULO DO VOLUME DO BIN DA MALHA ---
+        dx = (self._mesh_ref.upper_right[0] - self._mesh_ref.lower_left[0]) / nx
+        dy = (self._mesh_ref.upper_right[1] - self._mesh_ref.lower_left[1]) / ny
+        dz = (self._mesh_ref.upper_right[2] - self._mesh_ref.lower_left[2]) / nz
+        volume_bin = dx * dy * dz  # Volume em cm³
+
+        # Potência em Watts (Energia total depositada na célula)
+        t_p = sp.get_tally(name="tally_potencia")
+        pot_rel = t_p.get_values(value='mean').reshape(shape_bruto).sum(axis=3)
+        fator_norm = potencia_ref / (pot_rel.sum() * EV_J)
+        potencia_watts = pot_rel * EV_J * fator_norm
+
+        # Fluxo em n/cm².s (CORRIGIDO)
+        t_f = sp.get_tally(name="tally_fluxo")
+        fluxo_rel = t_f.get_values(value='mean').reshape(shape_bruto).sum(axis=3)
+        
+        # Divide pelo volume para ter a unidade correta de área
+        fluxo_ncm2s = (fluxo_rel * fator_norm) / volume_bin
+
+            # Coordenadas básicas para manter a compatibilidade de retorno
+        coords = {
+            'x': np.linspace(self._mesh_ref.lower_left[0], self._mesh_ref.upper_right[0], nx),
+            'y': np.linspace(self._mesh_ref.lower_left[1], self._mesh_ref.upper_right[1], ny),
+            'z': np.linspace(self._mesh_ref.lower_left[2], self._mesh_ref.upper_right[2], nz)
+        }
+        sp.close()
+        return fluxo_ncm2s, potencia_watts, coords
+
+
+
+
 
 
 
